@@ -1,5 +1,20 @@
+import xml.etree.ElementTree as ET
 import torch
 import torch.nn as nn
+
+""" input the file name of img, return img_width, img_height, bbox of each object in this img"""
+def imgXmlParser(fileName):
+    root = ET.parse(fileName +'.xml')
+    coordinates = []
+    for obj in root.iter('HRSC_Object'):
+        coordinate = {}
+        coordinate['x_min'] = int(obj.find('box_xmin').text)
+        coordinate['y_min'] = int(obj.find('box_ymin').text)
+        coordinate['x_max'] = int(obj.find('box_xmax').text)
+        coordinate['y_max'] = int(obj.find('box_ymax').text)
+        coordinates.append(coordinate)
+        
+    return int(root.find('Img_SizeWidth').text), int(root.find('Img_SizeHeight').text), coordinates
 
 def extract_glimpse(img_batch, size, offsets, centered=True, normalized=True):
     W, H = img_batch.size(-1), img_batch.size(-2)
