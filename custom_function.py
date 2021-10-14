@@ -2,7 +2,8 @@ import xml.etree.ElementTree as ET
 import torch
 import torch.nn as nn
 
-""" input the file name of img, return img_width, img_height, bbox of each object in this img"""
+""" input the file name of img, 
+    return img_width, img_height, bbox of each object in this img"""
 def imgXmlParser(fileName):
     root = ET.parse(fileName +'.xml')
     coordinates = []
