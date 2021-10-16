@@ -1,5 +1,17 @@
 from .custom_function import extract_glimpse, extract_multiple_glimpse
 
+
+def _weight_variable(shape):
+    w = torch.empty(shape)
+    init_w = torch.nn.init.trunc_normal_(w, stddev=0.01)
+    return init_w
+
+def _bias_variable(shape):
+    b = torch.empty(shape)
+    init_b = torch.zeros(shape, dtype=torch.float32)
+    return init_b
+
+
 class RetinaSensor:
     def __init__(self, img_size, glimpse_size):
         self.img_size = img_size
@@ -13,9 +25,9 @@ class LocationNetwork:
     def __init__(self, hidden_size, loc_dim, std=0.22, is_sampling=True):
         self.loc_dim = loc_dim
         self.std = std
-        self.w = weight_variable((hidden_size, loc_dim))
-        self.b = bias_variable((loc_dim,))
+        self.w = _weight_variable((hidden_size, loc_dim))
+        self.b = _bias_variable((loc_dim,))
         self.is_sampling = is_sampling
 
-    def __cal__(self, hidden_state):
-        mean_t = 
+    def __call__(self, hidden_state):
+        mean_t = torch.matmul(hidden_state, self.w) 
