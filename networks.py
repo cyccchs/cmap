@@ -69,3 +69,52 @@ class GlimpseNetwork(nn.Module):
 
         return g_t
 
+class LocationNetwork(nn.Module):
+    """
+        input_size: input size of the fc layer
+        output_size: output size of the fc layer
+        std: standard deviation of the normal distribution
+        h_t: hidden state vector of the core network for the
+             current time step 't'
+        
+        mu: 2D vector of shape(B,2)
+        l_t: 2D vector of shape(B,2)
+    """
+    def __init__(self, input_size, output_size, std):
+        super().__init__()
+
+        self.std = std
+        hid_size = input_size // 2
+        self.fc = nn.Linear(input_size, hid_size)
+        self.fc_lt = nn.Linear(hid_size, output_size)
+
+    def forward(self, h_t):
+        feat = F.relu(self.fc(h_t.detach()))
+        mu = torch.tanh(self.fc_lt(feat))
+
+        l_t = Normal(mu, self.std).rsample()
+        l_t = l_t.detach()
+        log_pi = Normal(mu, self.std).log_prob(l_t)
+        
+        log_pi = torch.sum(log_pi, dim=1)
+        l_t = torch.clamp(l_t, -1, 1)
+
+        return log_pi, l_t
+
+
+class CoreNetwork(nn.Module): #CCI
+    def __init__(self, input_size, hidden_size):
+        super().__init__()
+
+        self.input_size = input_size
+        self.hidden_size = hidden_size
+
+        self.i2h = nn.Linear(input_size, hidden_size)
+        self.h2h = nn.Linear(hidden_size, hidden_size)
+
+    def forward(self, g_t, h_prev):
+        h1 = self.i2h(g_t)
+        h2 = self.h2h(h_prev)
+        h_t = F.relu(h1 + h2)
+        
+        return h_t
