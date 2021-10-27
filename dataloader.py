@@ -3,7 +3,7 @@ import torch
 import cv2 as cv
 import xml.etree.ElementTree as ET
 
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data.dataset import DataLoader, Dataset
 
 def xmlParser(fileName):
     try:
@@ -24,6 +24,12 @@ def dataPreporcess():
 
     print(object_num_list)
 
+class shipDataloader(Dataset):
+    def __init__(self, rooot):
+        imgs = 
+    def __getitem__(self):
+
+    def __len__(self):
 
 
 

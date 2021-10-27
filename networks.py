@@ -101,8 +101,35 @@ class LocationNetwork(nn.Module):
 
         return log_pi, l_t
 
+class BaselineNetwork(nn.Module):
+    """
+        input_size: input_size of the fc layer
+        output_size: output size of the fc layer
+        h_t: hidden state vector of the core network for the current time step 't'
+
+        b_t: 2D vector of shape (B, 1). The baseline for the current time step 't'
+    """
+    def __init__(self, input_size, output_size):
+        super().__init__()
+
+        self.fc = nn.Linear(input_size, output_size)
+
+    def forward(self, h_t):
+        b_t = self.fc(h_t.detach())
+
+        return b_t
 
 class CoreNetwork(nn.Module): #CCI
+    """
+        h_t = relu( fc(h_t_prev) + fc(g_t))
+
+        input_size: input size of the rnn
+        hidden_size: hidden size of the rnn
+        g_t: 2D tensor of shape (B, hidden_size). Returned from glimpse network.
+        h_prev: 2D tensor of shape (B, hidden_size). Hidden state for previous timestep.
+
+        h_t: 2D tensor of shape (B, hidden_size). Hidden state for current timestep.
+    """
     def __init__(self, input_size, hidden_size):
         super().__init__()
 
@@ -118,3 +145,4 @@ class CoreNetwork(nn.Module): #CCI
         h_t = F.relu(h1 + h2)
         
         return h_t
+
