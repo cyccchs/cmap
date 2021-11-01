@@ -24,13 +24,13 @@ def dataPreporcess():
 
     print(object_num_list)
 
-class shipDataloader(Dataset):
+class HRSCDataloader(Dataset):
     def __init__(self, rooot):
-        imgs = 
+        pass
     def __getitem__(self):
-
+        pass
     def __len__(self):
-
+        pass
 
 
 
