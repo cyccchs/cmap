@@ -146,3 +146,12 @@ class CoreNetwork(nn.Module): #CCI
         
         return h_t
 
+class SoftAttention(nn.Module):
+    def __init__(self, wg_size, wh_size):
+        super().__init__()
+        self.wg_size = wg_size
+        self.wh_size = wh_size
+
+        self.wg = nn.Linear(wg_size,
+        
+
