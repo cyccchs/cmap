@@ -1,36 +1,46 @@
-import torchvision
+import os
 import torch
 import cv2 as cv
-import xml.etree.ElementTree as ET
-
+import numpy as np
 from torch.utils.data.dataset import DataLoader, Dataset
 
-def xmlParser(fileName):
-    try:
-        root = ET.parse(fileName)
-        object_num = 0
-        for obj in root.iter('HRSC_Object'):
-            object_num = object_num + 1
-        return object_num
-    except:
-        pass
-def dataPreporcess():
-    object_num_list = []
-    for i in range(1,1681):
-        name = './dataset/labels/1' + str(i).zfill(8) + '.xml'
-        object_num = xmlParser(name)
-        if object_num != None:
-            object_num_list.append(object_num)
-
-    print(object_num_list)
 
 class HRSCDataloader(Dataset):
     def __init__(self, rooot):
-        pass
+        self.image_names_path = 'HRSC2016/AllImages/HRSC_image_names.txt'
     def __getitem__(self):
         pass
     def __len__(self):
         pass
-
-
+    def _load_image_names(self):
+        assert os.path.exists(self.image_names_path), \
+                'Path not exist: {}'.format(self.image_names_path)
+        with open(self.image_names_path) as f:
+            image_name_list = [i.strip() for i in f.readlines()]
+        return image_names_list
+    def _load_annotation(self, index):
+        boxes, gt_classes = [], []
+        root, name = os.path.split(index)
+        xmlName = os.path.join(root.replace('AllImages', 'Annotations'), name[:-4]+'.xml')
+        with open(xmlName, 'r', encoding='utf-8-sig') as f:
+            content = f.read()
+            assert '<HRSC_Object>' in content, 'Background picture occured in %s' %xmlName
+            objects = content.split('<HRSC_Object>')
+            info = objects.pop(0)
+            for obj in objects:
+                assert len(obj) != 0, 'No object found in %s' %xmlName
+                cls_id = obj[obj.find('<Class_ID>')+10 : obj.find('</Class_ID>')]
+                diffculty = obj[obj.find('<difficult>')+11 : obj.find('</difficult>')]
+                if diffculty == '1':
+                    continue
+                cx = round(eval(obj[obj.find('<mbox_cx>')+9 : obj.find('</mbox_cx>')]))
+                cy = round(eval(obj[obj.find('<mbox_cy>')+9 : obj.find('</mbox_cy>')]))
+                w = round(eval(obj[obj.find('<mbox_w>')+9 : obj.find('</mbox_w>')]))
+                h = round(eval(obj[obj.find('<mbox_h>')+9 : obj.find('</mbox_h>')]))
+                a = eval(obj[obj.find('<mbox_ang>')+9 : obj.find('</mbox_ang>')])/math.pi*180
+                box = np.array([cx, cy, w, h, a])
+                boxes.append(box)
+                label = self.class_mapping(cls_id, self.level)
+                gt_classes.append(label)
+        return {'boxes': np.array(boxes), 'gt_classes': np.array(gt_classes)}
 
