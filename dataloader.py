@@ -6,18 +6,34 @@ from torch.utils.data.dataset import DataLoader, Dataset
 
 
 class HRSCDataloader(Dataset):
-    def __init__(self, rooot):
+    
+    def __init__(self, level=1):
         self.image_names_path = 'HRSC2016/AllImages/HRSC_image_names.txt'
-    def __getitem__(self):
-        pass
+        self.image_list = self._load_image_names()
+        self.level = level
+        if self.level == 1:
+            self.classes = ('__backround__', 'ship')
+        self.class_num = len(self.classes)
+        self.class_to_index = dict(zip(self.classes, range(self.class_num)))
+        self.augment = false
+    
+    def __getitem__(self, index):
+        img_path = self.image_list[index]
+        img = cv.cvtColor(cv.imread(img_path, cv.IMREAD_COLOR), cv.COLOR_BGR2RGB)
+        roidb = self._load_annotation(self.image_list[index])
+        get_index = np.where(roidb['gt_classes'] != 0)[0]
+        nt = len(roidb['boxes'])
+    
     def __len__(self):
-        pass
+        return len(self.image_list)
+    
     def _load_image_names(self):
         assert os.path.exists(self.image_names_path), \
                 'Path not exist: {}'.format(self.image_names_path)
         with open(self.image_names_path) as f:
             image_name_list = [i.strip() for i in f.readlines()]
         return image_names_list
+    
     def _load_annotation(self, index):
         boxes, gt_classes = [], []
         root, name = os.path.split(index)
@@ -43,4 +59,8 @@ class HRSCDataloader(Dataset):
                 label = self.class_mapping(cls_id, self.level)
                 gt_classes.append(label)
         return {'boxes': np.array(boxes), 'gt_classes': np.array(gt_classes)}
+    
+    def class_mapping(self, cls_id, level):
+        if level == 1:
+            return 1
 
