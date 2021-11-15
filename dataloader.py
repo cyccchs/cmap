@@ -3,6 +3,7 @@ import torch
 import cv2 as cv
 import numpy as np
 from torch.utils.data.dataset import DataLoader, Dataset
+from bbox import mask_valid_boxes, constraint_theta
 
 
 class HRSCDataloader(Dataset):
@@ -23,6 +24,30 @@ class HRSCDataloader(Dataset):
         roidb = self._load_annotation(self.image_list[index])
         get_index = np.where(roidb['gt_classes'] != 0)[0]
         nt = len(roidb['boxes'])
+        get_boxes = np.zeros((len(get_index), 6), dtype=np.float32)
+        if nt:
+            bboxes = roidb['boxes'][get_index, :]
+            get_boxes[:, :-1] = bboxes
+
+            mask = mask_valid_boxes(bboxes)
+            bboxes = bboxes[mask]
+            get_boxes = get_boxes[mask]
+            classes = self.classes[mask]
+
+            for i, bbox in enumerate(bboxes):
+                get_boxes[i, 5] = classes[i]
+            get_boxes = constraint_theta(get_boxes)
+            cx, cy, w, h = [get_boxes[:, x] for x in range(4)]
+            x1 = cx - 0.5*w
+            x2 = cx + 0.5*w
+            y1 = cy - 0.5*h
+            y2 = cy + 0.5*h
+            get_boxes[:, 0] = x1
+            get_boxes[:, 1] = y1
+            get_boxes[:, 2] = x2
+            get_boxes[:, 3] = y2
+        
+        return {'image': img, 'boxes': get_boxes, 'path': img_path}
     
     def __len__(self):
         return len(self.image_list)
@@ -63,4 +88,5 @@ class HRSCDataloader(Dataset):
     def class_mapping(self, cls_id, level):
         if level == 1:
             return 1
+
 
