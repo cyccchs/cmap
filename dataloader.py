@@ -6,7 +6,7 @@ from torch.utils.data.dataset import DataLoader, Dataset
 from bbox import mask_valid_boxes, constraint_theta
 
 
-class HRSCDataloader(Dataset):
+class HRSC2016(Dataset):
     
     def __init__(self, level=1):
         self.image_names_path = 'HRSC2016/AllImages/HRSC_image_names.txt'
