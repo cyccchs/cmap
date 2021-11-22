@@ -2,21 +2,22 @@ import os
 import torch
 import cv2 as cv
 import numpy as np
-from torch.utils.data.dataset import DataLoader, Dataset
+from torch.utils.data import DataLoader
+from torch.utils.data.dataset import Dataset
 from bbox import mask_valid_boxes, constraint_theta
 
 
 class HRSC2016(Dataset):
     
     def __init__(self, level=1):
-        self.image_names_path = 'HRSC2016/AllImages/HRSC_image_names.txt'
+        self.image_names_path = './HRSC2016/AllImages/HRSC_image_names.txt'
         self.image_list = self._load_image_names()
         self.level = level
         if self.level == 1:
             self.classes = ('__backround__', 'ship')
         self.class_num = len(self.classes)
         self.class_to_index = dict(zip(self.classes, range(self.class_num)))
-        self.augment = false
+        self.augment = False
     
     def __getitem__(self, index):
         img_path = self.image_list[index]
@@ -54,10 +55,10 @@ class HRSC2016(Dataset):
     
     def _load_image_names(self):
         assert os.path.exists(self.image_names_path), \
-                'Path not exist: {}'.format(self.image_names_path)
+            'Path not exist: {}'.format(self.image_names_path)
         with open(self.image_names_path) as f:
             image_name_list = [i.strip() for i in f.readlines()]
-        return image_names_list
+        return image_name_list
     
     def _load_annotation(self, index):
         boxes, gt_classes = [], []

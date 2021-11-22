@@ -124,17 +124,19 @@ class CoreNetwork(nn.Module): #CCI
         h_t = relu( fc(h_t_prev) + fc(g_t))
 
         input_size: input size of the rnn
-        hidden_size: hidden size of the rnn
+        hidden_size: hidden size of the rnni(256)
         g_t: 2D tensor of shape (B, hidden_size). Returned from glimpse network.
         h_prev: 2D tensor of shape (B, hidden_size). Hidden state for previous timestep.
 
         h_t: 2D tensor of shape (B, hidden_size). Hidden state for current timestep.
     """
-    def __init__(self, input_size, hidden_size):
+    def __init__(self, input_size, hidden_size, glimpse_num):
         super().__init__()
 
         self.input_size = input_size
         self.hidden_size = hidden_size
+        self.seq_len = glimpse_num
+        self.rnn = nn.LSTMCell(self.input_size,self.hidden_size)
 
         self.i2h = nn.Linear(input_size, hidden_size)
         self.h2h = nn.Linear(hidden_size, hidden_size)
@@ -145,14 +147,14 @@ class CoreNetwork(nn.Module): #CCI
         h_t = F.relu(h1 + h2)
         
         return h_t
-
+    
 class SelfAttention(nn.Module):
     def __init__(self, wg_size, wh_size):
         super().__init__()
-        self.w = nn.Linear(256, 256)
-        self.wq = nn.Linear(256, 256)
-        self.wk = nn.Linear(256, 256)
-        self.wv = nn.Linear(256, 256)
+        self.w = nn.Linear(256, 256, bias=False)
+        self.wq = nn.Linear(256, 256, bias=False)
+        self.wk = nn.Linear(256, 256, bias=False)
+        self.wv = nn.Linear(256, 256, bias=False)
     def forward(self, g_ts):
         G = torch.stack(g_ts[0], g_ts[1], g_ts[2], g_ts[3])
         x = self.w(G)
@@ -160,15 +162,23 @@ class SelfAttention(nn.Module):
         k = self.wk(x)
         v = self.wv(x)
         q_trans = torch.transpose(q, 0, 1)
-        alpha = F.softmax(torch.matmul(q_trans, k)/256**0.5)
-        s = torch.matmul(alpha,v)
+        a_t = F.softmax(torch.matmul(q_trans, k)/256**0.5)
+        s_t = torch.matmul(a_t,v)
 
-        return s
+        return s_t
 
 class SoftAttention(nn.Module):
     def __init__(self):
-        self.wg = nn.Linear(256,256)
-        self.wh = nn.Linear(256,256)
+        self.wg = nn.Linear(256, 256, bias=False)
+        self.wh = nn.Linear(256, 256, bias=False)
+        self.wy = nn.Linear(256, 256)
     def forward(self, g_ts, h_prev):
-        G = torch.tanh(self.wg(g_ts[i]) + self.wh(h_prev))
+        Y_t = torch.tanh(self.wg(g_ts) + self.wh(h_prev))
+        alpha_t = F.softmax(self.wy(Y_t))
+        z_t_list = [torch.mul(alpha_t[i], torch.index_select(g_ts, 1, torch.tensor(i))) for i in range(len(g_ts))]
+        z_stack = torch.stack(z_t_list, 2)
+        z_t = torch.sum(z_stack, 2) #similar to reduce_sum
+
+        return z_t
+
 
