@@ -1,6 +1,6 @@
 import torch
 from torch.distributions import uniform
-from networks import Retina, GlimpseNetwork, LocationNetwork
+from network import Retina, GlimpseNetwork, LoactionNetwork
 
 
 class Agent:

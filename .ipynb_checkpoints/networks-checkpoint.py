@@ -25,19 +25,19 @@ class Retina:
             patch.append(x[i, :, start[i, 1] : end[i, 1], start[i, 0] : end[i, 0]])
 
         return self.flatten(torch.stack(patch))
-
-    def flatten(self, input_tensor):
+    
+    def flatten(self, input_tensor)
         return torch.view(input_tensor[0], -1)
-
+    
     def denormalize(self, T, coords):
         """
         T: the size of the image
         convert [-1, 1] to [0, T]
         """
-        return (0.5 * ((coords + 1.0) * T)).long()
+        return(0.5 * ((coords + 1.0) * T)).long()
 
 class GlimpseNetwork(nn.Module):
-    """
+        """
         h_g: hidden layer for glimpse
         h_l: hidden layer for location
         l_pre: location(l) of previous time step
@@ -54,11 +54,11 @@ class GlimpseNetwork(nn.Module):
 
         self.fc3 = nn.Linear(h_g, h_g + h_l)
         self.fc4 = nn.Linear(h_l, h_g + h_l)
-
+        
     def forward(self, x, l_prev):
         glimpse = self.retina.extract_patch(x, l_prev)
         l_prev = l_prev.view(l_prev.size(0), -1)
-
+        
         g_out = F.relu(self.fc1(glimpse))
         l_out = F.relu(self.fc2(l_prev))
 
@@ -76,7 +76,7 @@ class LocationNetwork(nn.Module):
         std: standard deviation of the normal distribution
         h_t: hidden state vector of the core network for the
              current time step 't'
-
+        
         mu: 2D vector of shape(B,2)
         l_t: 2D vector of shape(B,2)
     """
@@ -95,7 +95,7 @@ class LocationNetwork(nn.Module):
         l_t = Normal(mu, self.std).rsample()
         l_t = l_t.detach()
         log_pi = Normal(mu, self.std).log_prob(l_t)
-
+        
         log_pi = torch.sum(log_pi, dim=1)
         l_t = torch.clamp(l_t, -1, 1)
 
@@ -145,9 +145,9 @@ class CoreNetwork(nn.Module): #CCI
         h1 = self.i2h(g_t)
         h2 = self.h2h(h_prev)
         h_t = F.relu(h1 + h2)
-
+        
         return h_t
-
+    
 class SelfAttention(nn.Module):
     def __init__(self, wg_size, wh_size):
         super().__init__()
