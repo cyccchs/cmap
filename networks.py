@@ -1,5 +1,4 @@
-import torch
-import torch.nn as nn
+
 import torch.nn.functional as F
 
 from torch.distributions import Normal
@@ -179,6 +178,6 @@ class SoftAttention(nn.Module):
         z_stack = torch.stack(z_t_list, 2)
         z_t = torch.sum(z_stack, 2) #similar to reduce_sum
 
-        return z_t
+        return alpha_t, z_t
 
 
