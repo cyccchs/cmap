@@ -35,7 +35,7 @@ class HRSC2016(Dataset):
             mask = mask_valid_boxes(bboxes)
             bboxes = bboxes[mask]
             get_boxes = get_boxes[mask]
-            classes = self.classes[mask]
+            classes = classes[mask]
 
             for i, bbox in enumerate(bboxes):
                 get_boxes[i, 5] = classes[i]
