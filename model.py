@@ -1,10 +1,13 @@
 import torch.nn as nn
-import network
+import torch
+import networks
 import agent
 
 class RecurrentAttention(nn.Module):
-    def __init__(self, g, k, s, c, h_g, h_l, glimpse_size, std, hidden_size, num_classes, num_agents):
-        self.std = std
-        for i in range(num_agents):
-            self.agents.append(Agent(h_g, h_l, glimpse_size, c, input_size, output_size))
-
+    def __init__(self, h_g, h_l, glimpse_size, c):
+        super().__init__()
+        self.init_l = torch.FloatTensor(4,2).uniform_(-1.0,1.0)
+        self.glimpsenn = networks.GlimpseNetwork(h_g, h_l, glimpse_size, c)
+    def forward(self, img):
+        return(self.glimpsenn(img, self.init_l))
+        

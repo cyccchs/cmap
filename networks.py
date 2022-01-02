@@ -1,4 +1,5 @@
-
+import torch
+import torch.nn as nn
 import torch.nn.functional as F
 
 from torch.distributions import Normal
@@ -13,20 +14,19 @@ class Retina:
         l: (b, 2) loaction
         size: glimpse size (int)
         """
-        b, c, h, w = x.shape()
-        start = self.denormalize(H, l)
+        b, c, h, w = x.shape
+        start = self.denormalize(h, l)
         end = start + self.g
 
         x = F.pad(x, (self.g//2, self.g//2, self.g//2, self.g//2))
-
         patch = []
         for i in range(b):
-            patch.append(x[i, :, start[i, 1] : end[i, 1], start[i, 0] : end[i, 0]])
+            patch.append(x[i, : , start[i, 1] : end[i, 1], start[i, 0] : end[i, 0]])
 
         return self.flatten(torch.stack(patch))
 
     def flatten(self, input_tensor):
-        return torch.view(input_tensor[0], -1)
+        return input_tensor[0].view(-1)
 
     def denormalize(self, T, coords):
         """
@@ -45,7 +45,7 @@ class GlimpseNetwork(nn.Module):
         super().__init__()
         self.retina = Retina(glimpse_size)
 
-        dimension = g * g * c
+        dimension = glimpse_size * glimpse_size * c
         self.fc1 = nn.Linear(dimension, h_g)
 
         dimension = 2
