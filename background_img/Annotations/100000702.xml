@@ -1,0 +1,36 @@
+<HRSC_Image>
+  <Img_ID>100000702</Img_ID>
+  <Place_ID>100000003</Place_ID>
+  <Source_ID>100000001</Source_ID>
+  <Img_NO>100000702</Img_NO>
+  <Img_FileName>100000702</Img_FileName>
+  <Img_FileFmt>bmp</Img_FileFmt>
+  <Img_Date>2012-04-03</Img_Date>
+  <Img_CusType>sea</Img_CusType>
+  <Img_Des>
+  </Img_Des>
+  <Img_Location>41.528286,71.304656</Img_Location>
+  <Img_SizeWidth>1109</Img_SizeWidth>
+  <Img_SizeHeight>784</Img_SizeHeight>
+  <Img_SizeDepth>3</Img_SizeDepth>
+  <Img_Resolution>1.07</Img_Resolution>
+  <Img_Resolution_Layer>18</Img_Resolution_Layer>
+  <Img_Scale>103</Img_Scale>
+  <Img_SclPxlNum>
+  </Img_SclPxlNum>
+  <segmented>0</segmented>
+  <Img_Havemask>0</Img_Havemask>
+  <Img_MaskFileName>
+  </Img_MaskFileName>
+  <Img_MaskFileFmt>
+  </Img_MaskFileFmt>
+  <Img_MaskType>
+  </Img_MaskType>
+  <Img_SegFileName>
+  </Img_SegFileName>
+  <Img_SegFileFmt>
+  </Img_SegFileFmt>
+  <Img_Rotation>292d</Img_Rotation>
+  <Annotated>1</Annotated>
+  <HRSC_Objects />
+</HRSC_Image>

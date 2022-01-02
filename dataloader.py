@@ -69,6 +69,8 @@ class HRSC2016(Dataset):
         with open(xmlName, 'r', encoding='utf-8-sig') as f:
             content = f.read()
             assert '<HRSC_Object>' in content, 'Background picture occured in %s' %xmlName
+            #if '<HRSC_Object>' not in content:
+            #    print(xmlName)
             objects = content.split('<HRSC_Object>')
             info = objects.pop(0)
             for obj in objects:
