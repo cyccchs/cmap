@@ -148,28 +148,31 @@ class CoreNetwork(nn.Module): #CCI
         return h_t
 
 class SelfAttention(nn.Module):
-    def __init__(self, wg_size, wh_size):
+    def __init__(self):
         super().__init__()
-        self.w = nn.Linear(256, 256, bias=False)
-        self.wq = nn.Linear(256, 256, bias=False)
-        self.wk = nn.Linear(256, 256, bias=False)
-        self.wv = nn.Linear(256, 256, bias=False)
+        self.w = nn.Linear(256, 256)
+        self.wq = nn.Linear(256, 256)
+        self.wk = nn.Linear(256, 256)
+        self.wv = nn.Linear(256, 256)
     def forward(self, g_ts):
-        G = torch.stack(g_ts[0], g_ts[1], g_ts[2], g_ts[3])
+        #G = torch.stack(g_ts[0], g_ts[1], g_ts[2], g_ts[3])
+        G = torch.stack((g_ts, g_ts, g_ts, g_ts), dim=1)
         x = self.w(G)
         q = self.wq(x)
-        k = self.wk(x)
+        k = self.wk(x) #(b, 4, 256)
         v = self.wv(x)
-        q_trans = torch.transpose(q, 0, 1)
-        a_t = F.softmax(torch.matmul(q_trans, k)/256**0.5)
+        q_trans = torch.transpose(q, 1, 2) #(b, 256, 4)
+        a_t = F.softmax(torch.matmul(k, q_trans)/256**0.5, dim=-1)
+        #matmul (b, 4, 4), softmax (b, 4, 4)
         s_t = torch.matmul(a_t,v)
 
         return s_t
 
 class SoftAttention(nn.Module):
     def __init__(self):
-        self.wg = nn.Linear(256, 256, bias=False)
-        self.wh = nn.Linear(256, 256, bias=False)
+        super().__init__()
+        self.wg = nn.Linear(256, 256)
+        self.wh = nn.Linear(256, 256)
         self.wy = nn.Linear(256, 256)
     def forward(self, g_ts, h_prev):
         Y_t = torch.tanh(self.wg(g_ts) + self.wh(h_prev))
