@@ -156,7 +156,7 @@ class SelfAttention(nn.Module):
         self.wv = nn.Linear(256, 256)
     def forward(self, g_ts):
         #G = torch.stack(g_ts[0], g_ts[1], g_ts[2], g_ts[3])
-        G = torch.stack((g_ts, g_ts, g_ts, g_ts), dim=1)
+        G = torch.stack((g_ts, g_ts, g_ts, g_ts), dim=1) # to represent 4 agents' g_t
         x = self.w(G)
         q = self.wq(x)
         k = self.wk(x) #(b, 4, 256)
@@ -164,23 +164,27 @@ class SelfAttention(nn.Module):
         q_trans = torch.transpose(q, 1, 2) #(b, 256, 4)
         a_t = F.softmax(torch.matmul(k, q_trans)/256**0.5, dim=-1)
         #matmul (b, 4, 4), softmax (b, 4, 4)
-        s_t = torch.matmul(a_t,v)
+        s_t = torch.matmul(a_t, v)
 
         return s_t
 
 class SoftAttention(nn.Module):
     def __init__(self):
         super().__init__()
-        self.wg = nn.Linear(256, 256)
-        self.wh = nn.Linear(256, 256)
-        self.wy = nn.Linear(256, 256)
+        self.wKey = nn.Linear(256, 256)
+        self.wQuery = nn.Linear(256, 256)
+        self.wg = nn.Linear(256, 1)
     def forward(self, g_ts, h_prev):
-        Y_t = torch.tanh(self.wg(g_ts) + self.wh(h_prev))
-        alpha_t = F.softmax(self.wy(Y_t))
-        z_t_list = [torch.mul(alpha_t[i], torch.index_select(g_ts, 1, torch.tensor(i))) for i in range(len(g_ts))]
-        z_stack = torch.stack(z_t_list, 2)
+        G = torch.stack((g_ts, g_ts, g_ts, g_ts), dim=1) # to represent 4 agents' g_t
+        y_list = [torch.tanh(self.wKey(G[i]) + self.wQuery(h_prev)) for i in range(len(G))]
+        m_list = [self.wg(y_list[i]) for i in range(len(G))]            #????????
+        m_concat = torch.cat([m_list[i] for i in range(len(G))], dim=1) #???????
+
+        alpha = F.softmax(m_concat, dim=-1)
+        z_list = [torch.mul(alpha[i], torch.index_select(g_ts, 1, torch.tensor(i))) for i in range(len(G))]
+        z_stack = torch.stack(z_list, 2)
         z_t = torch.sum(z_stack, 2) #similar to reduce_sum
 
-        return alpha_t, z_t
+        return alpha, z_t
 
 
