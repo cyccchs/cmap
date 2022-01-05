@@ -129,21 +129,16 @@ class CoreNetwork(nn.Module): #CCI
 
         h_t: 2D tensor of shape (B, hidden_size). Hidden state for current timestep.
     """
-    def __init__(self, input_size, hidden_size, glimpse_num):
+    def __init__(self, batch_size, hidden_size, glimpse_num):
         super().__init__()
 
-        self.input_size = input_size
+        self.batch_size = batch_size
         self.hidden_size = hidden_size
         self.seq_len = glimpse_num
-        self.rnn = nn.LSTMCell(self.input_size,self.hidden_size)
+        self.lstm = nn.LSTMCell(self.batch_size, self.hidden_size)
 
-        self.i2h = nn.Linear(input_size, hidden_size)
-        self.h2h = nn.Linear(hidden_size, hidden_size)
 
     def forward(self, g_t, h_prev):
-        h1 = self.i2h(g_t)
-        h2 = self.h2h(h_prev)
-        h_t = F.relu(h1 + h2)
 
         return h_t
 
