@@ -15,15 +15,15 @@ class RecurrentAttention(nn.Module):
         self.retina = networks.GlimpseNetwork(h_g, h_l, glimpse_size, c)
         self.selfatt = networks.SelfAttention()
         self.softatt = networks.SoftAttention()
+        self.location = networks.LocationNetwork(256, 2, std=0.22)
+        self.lstm = networks.CoreNetwork(lstm_size)
     
     def forward(self, img, existence):
         g_t = self.retina(img, self.init_l)
         s_t = self.selfatt(g_t)
         alpha, z_t = self.softatt(g_t, self.init_h)
-
-        lstm = nn.LSTMCell(4, self.lstm_size)
-        lstm_out, state = lstm(z_t)
-        lstm_out, state = lstm(z_t, (lstm_out,state))
+        h_t = self.lstm(z_t)
+        log_pi, l_t = self.location(h_t)
         
         return g_t
 
