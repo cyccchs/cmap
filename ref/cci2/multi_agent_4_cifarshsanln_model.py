@@ -889,7 +889,6 @@ class Softattention(object):
        m_list = [tf.nn.xw_plus_b(g_list[i], self.Wg, self.b) for i in range(len(a))]#[4 ? 1]
        m_concat = tf.concat([m_list[i] for i in range(len(a))], axis = 1)#[? 4]     
        alpha = tf.nn.softmax(m_concat)
-       print(alpha.size())
        z_list = [tf.multiply(a[i], tf.slice(alpha, (0, i), (-1, 1))) for i in range(len(a))]
        z_stack = tf.stack(z_list, axis = 2)
        z = tf.reduce_sum(z_stack, axis = 2)

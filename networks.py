@@ -83,9 +83,9 @@ class LocationNetwork(nn.Module):
         super().__init__()
 
         self.std = std
-        hid_size = input_size // 2
-        self.fc = nn.Linear(input_size, hid_size)
-        self.fc_lt = nn.Linear(hid_size, output_size)
+        self.hidden_size = input_size//2
+        self.fc = nn.Linear(input_size, output_size)
+        self.fc_lt = nn.Linear(self.hidden_size, output_size)
 
     def forward(self, h_t):
         feat = F.relu(self.fc(h_t.detach()))
@@ -129,18 +129,16 @@ class CoreNetwork(nn.Module): #CCI
 
         h_t: 2D tensor of shape (B, hidden_size). Hidden state for current timestep.
     """
-    def __init__(self, batch_size, hidden_size, glimpse_num):
+    def __init__(self, lstm_size):
         super().__init__()
 
-        self.batch_size = batch_size
-        self.hidden_size = hidden_size
-        self.seq_len = glimpse_num
-        self.lstm = nn.LSTMCell(self.batch_size, self.hidden_size)
+        self.lstm = nn.LSTMCell(4, lstm_size)
 
 
-    def forward(self, g_t, h_prev):
+    def forward(self, z_t):
+        lstm_out, state = self.lstm(z_t)
 
-        return h_t
+        return lstm_out
 
 class SelfAttention(nn.Module):
     def __init__(self):
