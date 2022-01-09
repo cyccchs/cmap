@@ -84,7 +84,7 @@ class LocationNetwork(nn.Module):
 
         self.std = std
         self.hidden_size = input_size//2
-        self.fc = nn.Linear(input_size, output_size)
+        self.fc = nn.Linear(input_size, self.hidden_size)
         self.fc_lt = nn.Linear(self.hidden_size, output_size)
 
     def forward(self, h_t):
@@ -113,10 +113,14 @@ class BaselineNetwork(nn.Module):
 
         self.fc = nn.Linear(input_size, output_size)
 
-    def forward(self, h_t):
-        b_t = self.fc(h_t.detach())
-
-        return b_t
+    def forward(self, b_t):
+        b_list = []
+        B = torch.unbind(b_t.detach(), dim=1)
+        for i in B:
+            b = self.fc(i)
+            b = torch.squeeze(b)
+            b_list.append(b)
+        return b_list
 
 class CoreNetwork(nn.Module): #CCI
     """
@@ -137,7 +141,6 @@ class CoreNetwork(nn.Module): #CCI
 
     def forward(self, z_t):
         lstm_out, state = self.lstm(z_t)
-
         return lstm_out
 
 class SelfAttention(nn.Module):
