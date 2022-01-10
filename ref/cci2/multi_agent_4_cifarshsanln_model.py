@@ -842,7 +842,7 @@ class Selfattention(object):
         b = tf.matmul(alpha, v)#[? 4 256]
         print(b)
         b = tf.unstack(b, axis = 1)
-        print(b)
+        print('HERE',b)
         return b
 
 class ClassificationNetwork(object):

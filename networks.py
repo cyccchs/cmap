@@ -113,9 +113,9 @@ class BaselineNetwork(nn.Module):
 
         self.fc = nn.Linear(input_size, output_size)
 
-    def forward(self, b_t):
+    def forward(self, s_t):
         b_list = []
-        B = torch.unbind(b_t.detach(), dim=1)
+        B = torch.unbind(s_t.detach(), dim=1)
         for i in B:
             b = self.fc(i)
             b = torch.squeeze(b)

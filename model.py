@@ -19,14 +19,17 @@ class RecurrentAttention(nn.Module):
     
     def forward(self, img, existence):
         l_t, h_t = self.reset()
+        b_list = []
 
         for i in range(4-1):
             g_t = self.retina(img, l_t)
-            b_t = self.selfatt(g_t)
+            s_t = self.selfatt(g_t)
             alpha, z_t = self.softatt(g_t, h_t)
             h_t = self.lstm(z_t)
             log_pi, l_t = self.location(h_t)
-            b_t = self.baseline(b_t)
+            b_t = self.baseline(s_t)
+            b_list.append(b_t)
+            print(len(b_list))
 
         return g_t
 
