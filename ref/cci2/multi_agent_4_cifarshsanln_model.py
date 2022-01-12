@@ -838,11 +838,11 @@ class Selfattention(object):
         q_trans = tf.transpose(q, [0, 2, 1])#[? 256 4]
         print(q_trans)
         alpha = tf.nn.softmax(tf.matmul(k, q_trans)/self.W**0.5)#(?, 4, 4)
-        print(alpha)
+
         b = tf.matmul(alpha, v)#[? 4 256]
-        print(b)
+
         b = tf.unstack(b, axis = 1)
-        print('HERE',b)
+        
         return b
 
 class ClassificationNetwork(object):
@@ -889,6 +889,7 @@ class Softattention(object):
        m_list = [tf.nn.xw_plus_b(g_list[i], self.Wg, self.b) for i in range(len(a))]#[4 ? 1]
        m_concat = tf.concat([m_list[i] for i in range(len(a))], axis = 1)#[? 4]     
        alpha = tf.nn.softmax(m_concat)
+       print('alpha', alpha.shape)
        z_list = [tf.multiply(a[i], tf.slice(alpha, (0, i), (-1, 1))) for i in range(len(a))]
        z_stack = tf.stack(z_list, axis = 2)
        z = tf.reduce_sum(z_stack, axis = 2)
@@ -977,6 +978,7 @@ class CoreNetwork(object):
             glimpse_4 = glimpse_network4(pths_t4, loc_t4)
             #init_loc = tf.zeros((self.batch_size, self.loc_dim),tf.float32)
             glimpse_stack = tf.stack([glimpse_1,glimpse_2,glimpse_3,glimpse_4])#[3 ? 256]
+            print('glimpse_stack', glimpse_stack.shape)
             glimpse_unstack = tf.unstack(glimpse_stack, axis = 0)
             b = self_attention(glimpse_1, glimpse_2, glimpse_3, glimpse_4)
             
@@ -1199,8 +1201,12 @@ class RecurrentAttentionModel(object):
         self.xent = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=self.lbl_ph, logits=logits))
 
         # RL reward for location_network
+        print('pred shape', pred.shape)
         reward = tf.stop_gradient(tf.cast(tf.equal(pred, self.lbl_ph), tf.float32))
+        print('reward shape', reward.shape)
+        print('alpha shape', self.alpha)
         reward1, reward2, reward3, reward4 = alpha_reward(self.alpha, reward)
+        print(len(reward1))
         
         rewards1 = tf.expand_dims(reward1, 1)             # [batch_sz, 1]
         rewards1 = tf.tile(rewards1, (1, num_glimpses))   # [batch_sz, timesteps]
