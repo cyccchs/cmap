@@ -884,7 +884,7 @@ class Softattention(object):
         self.Wg = _weight_variable((Wa_size, 1))
         self.b = _bias_variable((1,))
     def __call__(self, h_prev, a, i):
-      
+       # a: glimpse stack
        g_list = [tf.tanh(tf.matmul(a[i], self.Wa) + tf.matmul(h_prev, self.Wh)) for i in range(len(a))]#[4 ? 256]
        m_list = [tf.nn.xw_plus_b(g_list[i], self.Wg, self.b) for i in range(len(a))]#[4 ? 1]
        m_concat = tf.concat([m_list[i] for i in range(len(a))], axis = 1)#[? 4]     

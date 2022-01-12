@@ -1,41 +1,47 @@
 import torch.nn as nn
 import torch
 import networks
-import agent
-from torch.autograd import Variable
+from agent import Agent
 
 class RecurrentAttention(nn.Module):
-    def __init__(self, batch_size, h_g, h_l, glimpse_size, c, lstm_size):
+    def __init__(self, batch_size, h_g, h_l, glimpse_size, c, lstm_size, hidden_size, loc_dim, std):
         super().__init__()
+        self.agents = []
+        self.agent_num = 8
         
         self.batch_size = batch_size
         self.lstm_size = lstm_size
         self.retina = networks.GlimpseNetwork(h_g, h_l, glimpse_size, c)
+        self.location = networks.LocationNetwork(256, 2, std=0.22)
+        self.baseline = networks.BaselineNetwork(256, 1)
         self.selfatt = networks.SelfAttention()
         self.softatt = networks.SoftAttention()
-        self.location = networks.LocationNetwork(256, 2, std=0.22)
         self.lstm = networks.CoreNetwork(lstm_size)
-        self.baseline = networks.BaselineNetwork(256, 1)
+        self.classifier = networks.ActionNetwork(256, 2)
+        for i in range(self.agent_num):
+            self.agents.append(Agent(h_g, h_l, glimpse_size, c, hidden_size, loc_dim, std))
     
-    def forward(self, img, existence):
-        l_t, h_t = self.reset()
-        b_list = []
-
-        for i in range(4-1):
-            g_t = self.retina(img, l_t)
-            s_t = self.selfatt(g_t)
-            alpha, z_t = self.softatt(g_t, h_t)
-            h_t = self.lstm(z_t)
-            log_pi, l_t = self.location(h_t)
-            b_t = self.baseline(s_t)
-            b_list.append(b_t)
-            print(len(b_list))
-
-        return g_t
-
-    def reset(self):
-        init_l = torch.FloatTensor(self.batch_size, 2).uniform_(-1.0,1.0)
-        init_h = torch.zeros((4, self.lstm_size), dtype=torch.float32)
-
-        return init_l, init_h
+    def forward(self, img, h_t, l_t, last=False):
+        g_list = []
+        for i in range(self.agent_num):
+            g_list.append(self.agents[i].glimpse_feature(img, l_t))
+        s_t = self.selfatt(g_list)
+        alpha, z_t = self.softatt(g_list, h_t)
+        h_t = self.lstm(z_t)
+        log_pi, l_t = self.location(h_t)
+        b_list = self.baseline(s_t)
+        
+        #print('g_t', g_t.shape)
+        #print('s_t', s_t.shape)
+        #print('alpha', alpha.shape)
+        #print('h_t', h_t.shape)
+        #print('l_t', l_t.shape)
+        #print('b_t', len(b_list))
+        #print('log_pi', log_pi.shape)
+        
+        if last:
+            log_probas = self.classifier(h_t)
+            return h_t, l_t, b_list, log_pi, log_probas
+        
+        return h_t, l_t, b_list, log_pi
 
