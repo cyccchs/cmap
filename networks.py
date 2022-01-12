@@ -22,7 +22,6 @@ class Retina:
         patch = []
         for i in range(b):
             patch.append(x[i, : , start[i, 1] : end[i, 1], start[i, 0] : end[i, 0]])
-
         return self.flatten(torch.stack(patch))
 
     def flatten(self, input_tensor):
@@ -65,7 +64,6 @@ class GlimpseNetwork(nn.Module):
         where = self.fc4(l_out)
 
         g_t = F.relu(what + where)
-
         return g_t
 
 class LocationNetwork(nn.Module):
@@ -115,8 +113,8 @@ class BaselineNetwork(nn.Module):
 
     def forward(self, s_t):
         b_list = []
-        B = torch.unbind(s_t.detach(), dim=1)
-        for i in B:
+        S = torch.unbind(s_t.detach(), dim=1)
+        for i in S:
             b = self.fc(i)
             b = torch.squeeze(b)
             b_list.append(b)
@@ -136,7 +134,7 @@ class CoreNetwork(nn.Module): #CCI
     def __init__(self, lstm_size):
         super().__init__()
 
-        self.lstm = nn.LSTMCell(4, lstm_size)
+        self.lstm = nn.LSTMCell(256, lstm_size)
 
 
     def forward(self, z_t):
@@ -150,9 +148,9 @@ class SelfAttention(nn.Module):
         self.wq = nn.Linear(256, 256)
         self.wk = nn.Linear(256, 256)
         self.wv = nn.Linear(256, 256)
-    def forward(self, g_ts):
+    def forward(self, g_list):
         #G = torch.stack(g_ts[0], g_ts[1], g_ts[2], g_ts[3])
-        G = torch.stack((g_ts, g_ts, g_ts, g_ts), dim=1) # to represent 4 agents' g_t
+        G = torch.stack(g_list, dim=1) # to represent 4 agents' g_t
         x = self.w(G)
         q = self.wq(x)
         k = self.wk(x) #(b, 4, 256)
@@ -170,17 +168,43 @@ class SoftAttention(nn.Module):
         self.wKey = nn.Linear(256, 256)
         self.wQuery = nn.Linear(256, 256)
         self.wg = nn.Linear(256, 1)
-    def forward(self, g_ts, h_prev):
-        G = torch.stack((g_ts, g_ts, g_ts, g_ts), dim=1) # to represent 4 agents' g_t
-        y_list = [torch.tanh(self.wKey(G[i]) + self.wQuery(h_prev)) for i in range(len(G))]
-        m_list = [self.wg(y_list[i]) for i in range(len(G))]            #????????
-        m_concat = torch.cat([m_list[i] for i in range(len(G))], dim=1) #???????
-
+    def forward(self, g_list, h_t):
+        G = torch.stack(g_list) # to represent 4 agents' g_t
+        y_list = [torch.tanh(self.wKey(G[i]) + self.wQuery(h_t)) for i in range(len(G))]
+        m_list = [self.wg(y_list[i]) for i in range(len(G))]
+        m_concat = torch.cat([m_list[i] for i in range(len(G))], dim=1)
         alpha = F.softmax(m_concat, dim=-1)
-        z_list = [torch.mul(alpha[i], torch.index_select(g_ts, 1, torch.tensor(i))) for i in range(len(G))]
+        z_list = [torch.mul(G[i], torch.index_select(alpha, 1, torch.tensor(i))) for i in range(len(G))]
         z_stack = torch.stack(z_list, 2)
         z_t = torch.sum(z_stack, 2) #similar to reduce_sum
 
         return alpha, z_t
 
+class ActionNetwork(nn.Module):
+    """The action network.
+    Uses the internal state `h_t` of the core network to
+    produce the final output classification.
+    Concretely, feeds the hidden state `h_t` through a fc
+    layer followed by a softmax to create a vector of
+    output probabilities over the possible classes.
+    Hence, the environment action `a_t` is drawn from a
+    distribution conditioned on an affine transformation
+    of the hidden state vector `h_t`, or in other words,
+    the action network is simply a linear softmax classifier.
+    Args:
+        input_size: input size of the fc layer.
+        output_size: output size of the fc layer.
+        h_t: the hidden state vector of the core network
+            for the current time step `t`.
+    Returns:
+        a_t: output probability vector over the classes.
+    """
 
+    def __init__(self, input_size, output_size):
+        super().__init__()
+
+        self.fc = nn.Linear(input_size, output_size)
+
+    def forward(self, h_t):
+        a_t = F.log_softmax(self.fc(h_t), dim=1)
+        return a_t

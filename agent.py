@@ -1,20 +1,19 @@
 import torch
 from torch.distributions import uniform
-from networks import Retina, GlimpseNetwork, LocationNetwork
+from networks import Retina, GlimpseNetwork, LocationNetwork, BaselineNetwork
 
 
 class Agent:
-    def __init__(self, h_g, h_l, glimpse_size, c, input_size, output_size, std):
-        self.GlimpseNetwork = GlimpseNetwork(h_g, h_l, glimpse_size, c)
-        self.LocationNetwork = LocationNetwork(input_size, output_size, std)
-        self.BaselineNetwork = BaselineNetwork(input_size, output_size)
+    def __init__(self, h_g, h_l, glimpse_size, c, hidden_size, loc_dim, std):
+        self.retina = GlimpseNetwork(h_g, h_l, glimpse_size, c)
+        self.location = LocationNetwork(hidden_size, loc_dim, std)
+        self.baseline = BaselineNetwork(hidden_size, 1)
         self.init_location = uniform.Uniform(-1.0, 1.0).sample([16,2])
-        #sample([batch_size, loc_dim])
-    def glimpse_feature():
-        return self.GlimpseNetwork(x, l_prev)
-    def choose_action(self, x, l_prev):
-        return self.LocationNetwork(h_t)
-    def baseline_feedback():
-        return self.BaselineNetwork(h_t)
+    def glimpse_feature(self,img, l_t):
+        return self.retina(img, l_t)
+    def location(self, s_t):
+        return self.location(s_t)
+    def baseline(self, s_t):
+        return self.baseline(s_t)
 
         
