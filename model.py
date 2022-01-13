@@ -35,7 +35,7 @@ class MultiAgentRecurrentAttention(nn.Module):
             b = self.agents[i].baseline(s_list[i])
             b_list.append(b)
         
-        b_t = torch.stack(b_list) #[agent_num, batch_size]
+        b_t = torch.stack(b_list, dim=1) #[agent_num, batch_size]
         
         if debug:
             print('s_t', s_t.shape)

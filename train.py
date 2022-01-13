@@ -9,7 +9,7 @@ import torch.nn.functional as F
 
 ds = HRSC2016()
 collater = Collater(scales=800)
-batch_size = 2
+batch_size = 2 
 
 loader = DataLoader(
     dataset=ds,
@@ -18,12 +18,12 @@ loader = DataLoader(
     collate_fn=collater,
     shuffle=False)
 
-model = MultiAgentRecurrentAttention(batch_size, 128, 128, 3, 3, 256, 256, 2, 0.22)
+model = MultiAgentRecurrentAttention(batch_size, 128, 128, 16, 3, 256, 256, 2, 0.22)
 
 optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-for name, para in model.named_parameters():
-    print(name)
-    print(para.shape)
+#for name, para in model.named_parameters():
+#    print(name)
+#    print(para.shape)
 
 def reset():
     init_l = torch.FloatTensor(batch_size, 2).uniform_(-1.0,1.0) #batch size
@@ -50,17 +50,23 @@ for i, (ni,batch) in enumerate(pbar):
     l_list.append(l_t)
     b_list.append(b_t)
     log_pi_list.append(log_pi)
+
     
-    baselines = torch.stack(b_list, dim=1) #[agent_num, time_step, batch_size]
-    
+    log_pi_all = torch.stack(log_pi_list, dim=1).unsqueeze(2).repeat(1,1,8)
+    baselines = torch.stack(b_list, dim=1) #[batch_size, time_step, agent_num]
     predicted = torch.max(log_probs, 1)[1]  #indices store in element[1]
-    R = (predicted.detach() == torch.tensor(existence)).float()
-    print(log_probs)
-    print(existence)
-    loss = F.nll_loss(log_probs, torch.tensor(existence))
+    reward = (predicted.detach() == torch.tensor(existence)).float()
+    reward = (reward.unsqueeze(1).repeat(1,8)).unsqueeze(1).repeat(1,4,1) #same shape as baselines
+    advantage = reward - baselines.detach()
+    
+    loss_reinforce = torch.sum(-log_pi_all * advantage, dim=1)#sum along all glimpses
+    loss_reinforce = torch.mean(loss_reinforce, dim=0).sum()#mea along all batch then sum up
+    loss_baseline = F.mse_loss(baselines, reward)
+    loss_action = F.nll_loss(log_probs, torch.tensor(existence))
+
+    loss = loss_action + loss_baseline + loss_reinforce
     loss.backward()
     optimizer.step()
-    print('Reward', R)
 
 
 
