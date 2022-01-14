@@ -28,7 +28,7 @@ class RecurrentAttention(nn.Module):
         s_t = self.selfatt(g_list)
         alpha, z_t = self.softatt(g_list, h_t)
         h_t = self.lstm(z_t)
-        log_pi, l_t = self.location(h_t)
+        log_pi, l_t = self.location(s_t)
         b_list = self.baseline(s_t)
         
         #print('g_t', g_t.shape)

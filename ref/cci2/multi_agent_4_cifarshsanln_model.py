@@ -811,12 +811,15 @@ class BaseLineNetwork4(object):
     def __call__(self, h_ts):
         # Time independent baselines
         baselines = []
+        i = 0
         for h_t in h_ts[1:]:
+            print('i : ', i)
             baseline = tf.nn.xw_plus_b(h_t, self.w, self.b)
             baseline = tf.squeeze(baseline)
             baselines.append(baseline)
-
-        baselines = tf.stack(baselines)        # [timesteps, batch_sz]
+            i += 1
+        baselines = tf.stack(baselines)
+        print('baseline', baselines.shape)        # [timesteps, batch_sz]
         baselines = tf.transpose(baselines)   # [batch_sz, timesteps]
 
         return baselines
