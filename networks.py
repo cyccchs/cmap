@@ -165,7 +165,6 @@ class SelfAttention(nn.Module):
         a_t = F.softmax(torch.matmul(k, q_trans)/256**0.5, dim=-1)
         #matmul (b, 4, 4), softmax (b, 4, 4)
         s_t = torch.matmul(a_t, v)
-        print(s_t.shape)
 
         return s_t
 

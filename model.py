@@ -6,10 +6,10 @@ from agent import Agent
 debug = False
 
 class MultiAgentRecurrentAttention(nn.Module):
-    def __init__(self, batch_size, h_g, h_l, glimpse_size, c, lstm_size, hidden_size, loc_dim, std):
+    def __init__(self, batch_size, agent_num, h_g, h_l, glimpse_size, c, lstm_size, hidden_size, loc_dim, std):
         super().__init__()
         self.agents = []
-        self.agent_num = 4
+        self.agent_num = agent_num
         self.batch_size = batch_size
         self.lstm_size = lstm_size
         self.selfatt = networks.SelfAttention()
@@ -20,24 +20,25 @@ class MultiAgentRecurrentAttention(nn.Module):
             self.agents.append(Agent(h_g, h_l, glimpse_size, c, hidden_size, loc_dim, std))
     
     def forward(self, img, h_t, l_t, last=False):
-        g_list, s_list, b_list = [], [], []
+        g_list, s_list, b_list, l_list, log_pi_list = [], [], [], [], []
         
         for i in range(self.agent_num):
-            g_list.append(self.agents[i].glimpse_feature(img, l_t))
+            g_list.append(self.agents[i].glimpse_feature(img, l_t[i]))
         
         s_t = self.selfatt(g_list)
         s_list = torch.unbind(s_t, dim=1)
         alpha, z_t = self.softatt(g_list, h_t)
         h_t = self.lstm(z_t)
-        log_pi, l_t = self.location(s_t)
-        b_list = self.baseline(s_t)
         
         for i in range(self.agent_num):
             log_pi, l_t = self.agents[i].location(s_list[i])
             b = self.agents[i].baseline(s_list[i])
             b_list.append(b)
+            l_list.append(l_t)
+            log_pi_list.append(log_pi)
         
         b_t = torch.stack(b_list, dim=1) #[agent_num, batch_size]
+        log_pi_t = torch.stack(log_pi_list, dim=1)
         
         if debug:
             print('s_t', s_t.shape)
@@ -50,7 +51,7 @@ class MultiAgentRecurrentAttention(nn.Module):
         
         if last:
             log_probas = self.classifier(h_t)
-            return h_t, l_t, b_t, log_pi, log_probas, alpha
+            return h_t, l_list, b_t, log_pi_t, log_probas, alpha
         
-        return h_t, l_t, b_t, log_pi
+        return h_t, l_list, b_t, log_pi_t
 
