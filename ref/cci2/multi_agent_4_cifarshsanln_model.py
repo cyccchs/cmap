@@ -813,13 +813,13 @@ class BaseLineNetwork4(object):
         baselines = []
         i = 0
         for h_t in h_ts[1:]:
-            print('i : ', i)
+            print('i',i)
             baseline = tf.nn.xw_plus_b(h_t, self.w, self.b)
             baseline = tf.squeeze(baseline)
             baselines.append(baseline)
-            i += 1
-        baselines = tf.stack(baselines)
-        print('baseline', baselines.shape)        # [timesteps, batch_sz]
+            i = i + 1
+
+        baselines = tf.stack(baselines)        # [timesteps, batch_sz]
         baselines = tf.transpose(baselines)   # [batch_sz, timesteps]
 
         return baselines
@@ -833,19 +833,18 @@ class Selfattention(object):
     def __call__(self,g1, g2, g3, g4):
         a = tf.stop_gradient(tf.stack([g1, g2, g3, g4], 1))
         x = tf.layers.dense(a, self.W)
-        print(x)
+ 
         q = tf.layers.dense(x, self.Wq)#[? 4 256]
         k = tf.layers.dense(x, self.Wk)#[? 4 256]
         v = tf.layers.dense(x, self.Wv)#[? 4 256]
-        print("llllllllll")
+
         q_trans = tf.transpose(q, [0, 2, 1])#[? 256 4]
-        print(q_trans)
+
         alpha = tf.nn.softmax(tf.matmul(k, q_trans)/self.W**0.5)#(?, 4, 4)
 
         b = tf.matmul(alpha, v)#[? 4 256]
 
         b = tf.unstack(b, axis = 1)
-        
         return b
 
 class ClassificationNetwork(object):
@@ -1001,7 +1000,7 @@ class CoreNetwork(object):
                     
                     inp, b = loop_function(b_prev, i)
                     #inp = [inp]
-                    print('rnn1')
+
                 #soft attention maybe added in here (without CNN) 第一次沒有loopfunction因為已在外先做了
                         #hard的lstm取代soft的lstm
                         #variable_scope.get_variable_scope().reuse_variables()
@@ -1023,12 +1022,10 @@ class CoreNetwork(object):
                 b3_ts.append(b[2])
                 b4_ts.append(b[3])
                 
-                print('rnn2')
+
                 if loop_function is not None:
                     prev = rnn_out
-                    print('rnn3')
-                print('rnn4')
-            print('rnn5')
+ 
             return outputs,state,inp,wa,alpha, b1_ts, b2_ts, b3_ts, b4_ts
         # lstm init h_t
         init_state = cell.zero_state(self.batch_size, tf.float32)
@@ -1289,7 +1286,7 @@ class RecurrentAttentionModel(object):
                 writer = csv.writer(csvfile)
                 writer.writerow(['step', 'acc'])
             for step in range(num_steps):
-                #print("111111")
+
                 random_idx = np.arange(train_x.shape[0])
                 np.random.shuffle(random_idx)
     
@@ -1301,10 +1298,10 @@ class RecurrentAttentionModel(object):
             # Make image as fractions for attention
                 images = np.tile(batch_x_train, [num_MC, 1])
                 labels = np.tile(batch_y_train, [num_MC])
-                #print("222222")
+
                 output_feed = [self.train_op, self.loss, self.xent, self.reward, self.advantage1, self.baselines_mse1, self.learning_rate,self.alpha]
                 _, loss, xent, reward, advantage1, baselines_mse1, learning_rate,alpha = sess.run(output_feed, feed_dict={self.img_ph: images, self.lbl_ph: labels, self.is_training:True})
-                #print("333333")
+
                 # log
                 if step and step % 100 == 0:
                     random_idx = np.arange(test_x.shape[0])
@@ -1341,10 +1338,9 @@ class RecurrentAttentionModel(object):
                         list_.append(loss)
                         list_.append(reward)
                         writer.writerow(list_)
-                    #print(g2)
+
                     #alpha_size = int(np.sqrt(alpha_.shape[1]))
-                    #print(b)
-                    #print(mmm)
+
                     '''
                     alpha_reshape = np.reshape(alpha_, (num_MC*BATCH_SIZE, num_MC*BATCH_SIZE))# 16 16
                     alpha_resize = skimage.transform.pyramid_expand(alpha_reshape, upscale = 16, sigma=20)  # 256 256

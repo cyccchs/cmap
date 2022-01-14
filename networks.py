@@ -6,8 +6,10 @@ from torch.distributions import Normal
 
 
 class Retina:
+    
     def __init__(self, glimpse_size):
         self.g = glimpse_size
+    
     def extract_patch(self, x, l):
         """
         x: (b,h,w,c) input image batch
@@ -22,6 +24,7 @@ class Retina:
         patch = []
         for i in range(b):
             patch.append(x[i, : , start[i, 1] : end[i, 1], start[i, 0] : end[i, 0]])
+        
         return self.flatten(torch.stack(patch))
 
     def flatten(self, input_tensor):
@@ -40,6 +43,7 @@ class GlimpseNetwork(nn.Module):
         h_l: hidden layer for location
         l_pre: location(l) of previous time step
         """
+    
     def __init__(self, h_g, h_l, glimpse_size, c):
         super().__init__()
         self.retina = Retina(glimpse_size)
@@ -64,6 +68,7 @@ class GlimpseNetwork(nn.Module):
         where = self.fc4(l_out)
 
         g_t = F.relu(what + where)
+        
         return g_t
 
 class LocationNetwork(nn.Module):
@@ -77,6 +82,7 @@ class LocationNetwork(nn.Module):
         mu: 2D vector of shape(B,2)
         l_t: 2D vector of shape(B,2)
     """
+    
     def __init__(self, input_size, output_size, std):
         super().__init__()
 
@@ -112,45 +118,45 @@ class BaselineNetwork(nn.Module):
         self.fc = nn.Linear(input_size, output_size)
 
     def forward(self, s_t):
-        b_list = []
-        S = torch.unbind(s_t.detach(), dim=1)
-        for i in S:
-            b = self.fc(i)
-            b = torch.squeeze(b)
-            b_list.append(b)
-        return b_list
+        b = self.fc(s_t.detach())
+        b = torch.squeeze(b)
+        
+        return b
 
-class CoreNetwork(nn.Module): #CCI
+class CoreNetwork(nn.Module): #CCI(LSTM cell)
     """
         h_t = relu( fc(h_t_prev) + fc(g_t))
 
         input_size: input size of the rnn
-        hidden_size: hidden size of the rnni(256)
+        hidden_size: hidden size of the rnn(256)
         g_t: 2D tensor of shape (B, hidden_size). Returned from glimpse network.
         h_prev: 2D tensor of shape (B, hidden_size). Hidden state for previous timestep.
 
         h_t: 2D tensor of shape (B, hidden_size). Hidden state for current timestep.
     """
-    def __init__(self, lstm_size):
+    def __init__(self, batch_size, lstm_size):
         super().__init__()
 
-        self.lstm = nn.LSTMCell(256, lstm_size)
-
-
+        self.lstm = nn.LSTMCell(lstm_size, lstm_size)
+        self.h = torch.zeros(batch_size, lstm_size, dtype=torch.float32, requires_grad=True)
+        self.c = torch.zeros(batch_size, lstm_size, dtype=torch.float32, requires_grad=True)
     def forward(self, z_t):
-        lstm_out, state = self.lstm(z_t)
-        return lstm_out
+        
+        self.h, self.c = self.lstm(z_t, (self.h,self.c))
+        
+        return self.h.detach()
 
 class SelfAttention(nn.Module):
+    
     def __init__(self):
         super().__init__()
         self.w = nn.Linear(256, 256)
         self.wq = nn.Linear(256, 256)
         self.wk = nn.Linear(256, 256)
         self.wv = nn.Linear(256, 256)
+    
     def forward(self, g_list):
-        #G = torch.stack(g_ts[0], g_ts[1], g_ts[2], g_ts[3])
-        G = torch.stack(g_list, dim=1) # to represent 4 agents' g_t
+        G = torch.stack(g_list, dim=1)
         x = self.w(G)
         q = self.wq(x)
         k = self.wk(x) #(b, 4, 256)
@@ -164,14 +170,16 @@ class SelfAttention(nn.Module):
         return s_t
 
 class SoftAttention(nn.Module):
+    
     def __init__(self):
         super().__init__()
-        self.wKey = nn.Linear(256, 256)
-        self.wQuery = nn.Linear(256, 256)
+        self.wk = nn.Linear(256, 256)
+        self.wq = nn.Linear(256, 256)
         self.wg = nn.Linear(256, 1)
+    
     def forward(self, g_list, h_t):
         G = torch.stack(g_list) # to represent 4 agents' g_t
-        y_list = [torch.tanh(self.wKey(G[i]) + self.wQuery(h_t)) for i in range(len(G))]
+        y_list = [torch.tanh(self.wk(G[i]) + self.wq(h_t)) for i in range(len(G))]
         m_list = [self.wg(y_list[i]) for i in range(len(G))]
         m_concat = torch.cat([m_list[i] for i in range(len(G))], dim=1)
         alpha = F.softmax(m_concat, dim=-1)
@@ -207,5 +215,5 @@ class ActionNetwork(nn.Module):
         self.fc = nn.Linear(input_size, output_size)
 
     def forward(self, h_t):
-        a_t = F.log_softmax(self.fc(h_t), dim=1)
-        return a_t
+        action = F.log_softmax(self.fc(h_t), dim=1)
+        return action
