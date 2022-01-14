@@ -9,13 +9,13 @@ class MultiAgentRecurrentAttention(nn.Module):
     def __init__(self, batch_size, h_g, h_l, glimpse_size, c, lstm_size, hidden_size, loc_dim, std):
         super().__init__()
         self.agents = []
-        self.agent_num = 8
+        self.agent_num = 4
         self.batch_size = batch_size
         self.lstm_size = lstm_size
         self.selfatt = networks.SelfAttention()
         self.softatt = networks.SoftAttention()
-        self.lstm = networks.CoreNetwork(lstm_size)
-        self.classifier = networks.ActionNetwork(256, 2)
+        self.lstm = networks.CoreNetwork(batch_size, lstm_size)
+        self.classifier = networks.ActionNetwork(hidden_size, 2)
         for i in range(self.agent_num):
             self.agents.append(Agent(h_g, h_l, glimpse_size, c, hidden_size, loc_dim, std))
     
@@ -48,7 +48,7 @@ class MultiAgentRecurrentAttention(nn.Module):
         
         if last:
             log_probas = self.classifier(h_t)
-            return h_t, l_t, b_t, log_pi, log_probas
+            return h_t, l_t, b_t, log_pi, log_probas, alpha
         
         return h_t, l_t, b_t, log_pi
 

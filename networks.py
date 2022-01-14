@@ -123,7 +123,7 @@ class BaselineNetwork(nn.Module):
         
         return b
 
-class CoreNetwork(nn.Module): #CCI
+class CoreNetwork(nn.Module): #CCI(LSTM cell)
     """
         h_t = relu( fc(h_t_prev) + fc(g_t))
 
@@ -134,12 +134,12 @@ class CoreNetwork(nn.Module): #CCI
 
         h_t: 2D tensor of shape (B, hidden_size). Hidden state for current timestep.
     """
-    def __init__(self, lstm_size):
+    def __init__(self, batch_size, lstm_size):
         super().__init__()
 
-        self.lstm = nn.LSTMCell(256, lstm_size)
-        self.h = torch.zeros(2,256, dtype=torch.float32, requires_grad=True)
-        self.c = torch.zeros(2,256, dtype=torch.float32, requires_grad=True)
+        self.lstm = nn.LSTMCell(lstm_size, lstm_size)
+        self.h = torch.zeros(batch_size, lstm_size, dtype=torch.float32, requires_grad=True)
+        self.c = torch.zeros(batch_size, lstm_size, dtype=torch.float32, requires_grad=True)
     def forward(self, z_t):
         
         self.h, self.c = self.lstm(z_t, (self.h,self.c))
@@ -172,13 +172,13 @@ class SoftAttention(nn.Module):
     
     def __init__(self):
         super().__init__()
-        self.wKey = nn.Linear(256, 256)
-        self.wQuery = nn.Linear(256, 256)
+        self.wk = nn.Linear(256, 256)
+        self.wq = nn.Linear(256, 256)
         self.wg = nn.Linear(256, 1)
     
     def forward(self, g_list, h_t):
         G = torch.stack(g_list) # to represent 4 agents' g_t
-        y_list = [torch.tanh(self.wKey(G[i]) + self.wQuery(h_t)) for i in range(len(G))]
+        y_list = [torch.tanh(self.wk(G[i]) + self.wq(h_t)) for i in range(len(G))]
         m_list = [self.wg(y_list[i]) for i in range(len(G))]
         m_concat = torch.cat([m_list[i] for i in range(len(G))], dim=1)
         alpha = F.softmax(m_concat, dim=-1)

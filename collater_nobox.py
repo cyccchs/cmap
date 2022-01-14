@@ -26,6 +26,7 @@ class Collater(object):
 
         images = [sample['image'] for sample in batch]
         existence = [sample['existence'] for sample in batch]
+        path = [sample['path'] for sample in batch]
         batch_size = len(images)
         max_width, max_height = -1, -1
         for i in range(batch_size):
@@ -41,4 +42,4 @@ class Collater(object):
             im, im_scale = rescale(im)
             height, width = im.shape[0], im.shape[1]
             padded_ims[i, :, :height, :width] = transform(im)
-        return {'image': padded_ims, 'existence': existence}
+        return {'image': padded_ims, 'existence': existence, 'path': path}
