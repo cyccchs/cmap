@@ -87,13 +87,10 @@ class LocationNetwork(nn.Module):
         super().__init__()
 
         self.std = std
-        self.hidden_size = input_size//2
-        self.fc = nn.Linear(input_size, self.hidden_size)
-        self.fc_lt = nn.Linear(self.hidden_size, output_size)
+        self.fc = nn.Linear(input_size, output_size)
 
-    def forward(self, h_t):
-        feat = F.relu(self.fc(h_t.detach()))
-        mu = torch.tanh(self.fc_lt(feat))
+    def forward(self, s_t):
+        mu = torch.tanh(self.fc(s_t))
 
         l_t = Normal(mu, self.std).rsample()
         l_t = l_t.detach()

@@ -20,19 +20,19 @@ class MultiAgentRecurrentAttention(nn.Module):
             self.agents.append(Agent(h_g, h_l, glimpse_size, c, hidden_size, loc_dim, std))
     
     def forward(self, img, h_t, l_t, last=False):
-        g_list, s_list, b_list, l_list, log_pi_list = [], [], [], [], []
+        g_list, b_list, l_list, log_pi_list = [], [], [], []
         
         for i in range(self.agent_num):
             g_list.append(self.agents[i].glimpse_feature(img, l_t[i]))
         
         s_t = self.selfatt(g_list)
-        s_list = torch.unbind(s_t, dim=1)
+        s_t = torch.unbind(s_t, dim=1)
         alpha, z_t = self.softatt(g_list, h_t)
         h_t = self.lstm(z_t)
         
         for i in range(self.agent_num):
-            log_pi, l_t = self.agents[i].location(s_list[i])
-            b = self.agents[i].baseline(s_list[i])
+            log_pi, l_t = self.agents[i].location(s_t[i])
+            b = self.agents[i].baseline(s_t[i])
             b_list.append(b)
             l_list.append(l_t)
             log_pi_list.append(log_pi)
