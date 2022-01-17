@@ -10,8 +10,8 @@ from bbox import mask_valid_boxes, constraint_theta
 
 class HRSC2016(Dataset):
     
-    def __init__(self, level=1, binary=True):
-        self.image_names_path = './HRSC2016/AllImages/HRSC_image_names.txt'
+    def __init__(self, name_path, level=1, binary=True):
+        self.image_names_path = name_path
         self.image_list = self._load_image_names()
         self.binary = binary
         self.level = level
