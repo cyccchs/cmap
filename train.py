@@ -18,7 +18,7 @@ class train:
         self.collater = Collater(scales=800)
         self.batch_size = 16
         self.agent_num = 4
-        self. epoch_num = 3
+        self. epoch_num = 1
         self.loader = DataLoader(
                     dataset=self.ds,
                     batch_size=self.batch_size,
@@ -36,7 +36,7 @@ class train:
                     lstm_size = 256, 
                     hidden_size = 256, 
                     loc_dim = 2, 
-                    std = 0.05)
+                    std = 0.2)
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.00001)
 
     def reset(self):
@@ -62,14 +62,18 @@ class train:
         return torch.stack(reward_list, dim=0)
 
     def train(self):
-        for i in range(self.epoch_num):
-            self.one_epoch()
+        for i in range(5):
+            avg_acc, avg_loss = self.one_epoch()
+            writer.add_scalar('avg acc', avg_acc, i)
+            writer.add_scalar('avg loss', avg_loss, i)
+
 
     def one_epoch(self):
         self.model.train()
         print('EPOCH START')
         l_t, h_t = self.reset()
         iteration = 0
+        acc_list, loss_list = [], []
         pbar = tqdm(enumerate(self.loader), total=len(self.loader))
         for i, (ni,batch) in enumerate(pbar):
             imgs, existence = batch['image'], batch['existence']
@@ -112,12 +116,15 @@ class train:
             print('LOSS: ', loss.item())
             correct = (predicted==torch.tensor(existence)).float()
             acc = 100*(correct.sum()/len(existence))
+            acc_list.append(acc)
+            loss_list.append(loss)
+
+            writer.add_scalar('accuracy', acc, iteration)
             print('ACC', acc)
             loss.backward()
             self.optimizer.step()
             iteration = iteration + 1
-        #    plt.imshow(imgs[0].permute(1,2,0))
-        #    plt.show()
+        return sum(acc_list)/len(acc_list), sum(loss_list)/len(loss_list)           
 writer.close()
 
 if __name__ == '__main__':
