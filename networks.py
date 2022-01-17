@@ -138,7 +138,7 @@ class CoreNetwork(nn.Module): #CCI(LSTM cell)
         self.h = torch.zeros(batch_size, lstm_size, dtype=torch.float32, requires_grad=True)
         self.c = torch.zeros(batch_size, lstm_size, dtype=torch.float32, requires_grad=True)
     def forward(self, z_t):
-        
+         
         self.h, self.c = self.lstm(z_t, (self.h,self.c))
         
         return self.h.detach()

@@ -17,7 +17,7 @@ class train:
         self.ds = HRSC2016('./HRSC2016/Train/AllImages/image_names.txt')
         self.collater = Collater(scales=800)
         self.batch_size = 16
-        self.glimpse_num = 6
+        self.glimpse_num = 4
         self.agent_num = 4
         self.epoch_num = 5
         self.loader = DataLoader(
@@ -32,7 +32,7 @@ class train:
                     agent_num = self.agent_num,
                     h_g = 128,
                     h_l = 128,
-                    glimpse_size = 9, 
+                    glimpse_size = 3, 
                     c = 3, 
                     lstm_size = 256, 
                     hidden_size = 256, 
@@ -97,6 +97,9 @@ class train:
             log_pi_all = torch.stack(log_pi_list, dim=1) #[batch_size, time_step, agent_num]
             baselines = torch.stack(b_list, dim=1) #[batch_size, time_step, agent_num]
             predicted = torch.max(log_probs, 1)[1]  #indices store in element[1]
+            if (predicted.shape != torch.tensor(existence).shape):
+                print('not eq')
+                existence = predicted.data()
             reward = (predicted.detach() == torch.tensor(existence)).float()
             reward = self.weighted_reward(reward, alpha)
             reward = reward.unsqueeze(1).repeat(1,self.glimpse_num,1) 
