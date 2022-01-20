@@ -14,12 +14,12 @@ writer = SummaryWriter()
 
 class train:
     def __init__(self):
-        self.ds = HRSC2016('./HRSC2016/Train/AllImages/image_names.txt')
+        self.ds = HRSC2016('./HRSC2016/FullDataSet/AllImages/image_names.txt')
         self.collater = Collater(scales=800)
         self.batch_size = 16
         self.glimpse_num = 4
         self.agent_num = 4
-        self.epoch_num = 5
+        self.epoch_num = 100
         self.loader = DataLoader(
                     dataset=self.ds,
                     batch_size=self.batch_size,
@@ -32,12 +32,12 @@ class train:
                     agent_num = self.agent_num,
                     h_g = 128,
                     h_l = 128,
-                    glimpse_size = 3, 
+                    glimpse_size = 9, 
                     c = 3, 
                     lstm_size = 256, 
                     hidden_size = 256, 
                     loc_dim = 2, 
-                    std = 0.2)
+                    std = 0.8)
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.00001)
 
     def reset(self):
@@ -52,7 +52,6 @@ class train:
         return init_l_list, init_h
 
     def weighted_reward(self, reward, alpha):
-        
         reward_list = []
         for i in range(self.batch_size):
             if reward[i]==0:
@@ -89,7 +88,9 @@ class train:
                 b_list.append(b_t)
                 log_pi_list.append(log_pi_t)
             
-            h_t, l_t, b_t, log_pi, log_probs, alpha = self.model(imgs, h_t, l_t, last=True)
+            #h_t, l_t, b_t, log_pi, log_probs, alpha = self.model(imgs, h_t, l_t, last=True)
+            h_t, l_t, b_t, log_pi, log_probs = self.model(imgs, h_t, l_t, last=True)
+            alpha = torch.ones(16, 4, dtype=torch.float32)
             l_list.append(l_t)
             b_list.append(b_t)
             log_pi_list.append(log_pi_t)
@@ -97,9 +98,6 @@ class train:
             log_pi_all = torch.stack(log_pi_list, dim=1) #[batch_size, time_step, agent_num]
             baselines = torch.stack(b_list, dim=1) #[batch_size, time_step, agent_num]
             predicted = torch.max(log_probs, 1)[1]  #indices store in element[1]
-            if (predicted.shape != torch.tensor(existence).shape):
-                print('not eq')
-                existence = predicted.data()
             reward = (predicted.detach() == torch.tensor(existence)).float()
             reward = self.weighted_reward(reward, alpha)
             reward = reward.unsqueeze(1).repeat(1,self.glimpse_num,1) 

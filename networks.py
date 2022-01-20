@@ -24,7 +24,8 @@ class Retina:
         patch = []
         for i in range(b):
             patch.append(x[i, : , start[i, 1] : end[i, 1], start[i, 0] : end[i, 0]])
-        
+        for i in range(len(patch)):
+            print(patch[i].shape)
         return self.flatten(torch.stack(patch))
 
     def flatten(self, input_tensor):
