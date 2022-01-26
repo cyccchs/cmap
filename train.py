@@ -5,6 +5,7 @@ from torch.utils.data import DataLoader
 from torch.utils.data.dataset import Dataset
 from collater_nobox import *
 from model import *
+from utils import draw
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
 from torch.utils.tensorboard import SummaryWriter
@@ -18,8 +19,8 @@ class train:
         self.collater = Collater(scales=800)
         self.batch_size = 16
         self.glimpse_num = 4
-        self.agent_num = 4
-        self.epoch_num = 100
+        self.agent_num = 5
+        self.epoch_num = 20
         self.loader = DataLoader(
                     dataset=self.ds,
                     batch_size=self.batch_size,
@@ -32,13 +33,13 @@ class train:
                     agent_num = self.agent_num,
                     h_g = 128,
                     h_l = 128,
-                    glimpse_size = 11, 
+                    glimpse_size = 50, 
                     c = 3, 
                     lstm_size = 256, 
                     hidden_size = 256, 
                     loc_dim = 2, 
                     std = 0.2)
-        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.00001)
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.0001)
 
     def reset(self):
         
@@ -55,9 +56,9 @@ class train:
         reward_list = []
         for i in range(self.batch_size):
             if reward[i]==0:
-                reward_list.append(4*alpha[i])
+                reward_list.append(-1*alpha[i])
             else:
-                reward_list.append(-4*alpha[i])
+                reward_list.append(alpha[i])
         
         return torch.stack(reward_list, dim=0)
 
@@ -90,8 +91,16 @@ class train:
             
             #h_t, l_t, b_t, log_pi, log_probs, alpha = self.model(imgs, h_t, l_t, last=True)
             h_t, l_t, b_t, log_pi, log_probs = self.model(imgs, h_t, l_t, last=True)
-            alpha = torch.ones(16, 4, dtype=torch.float32)
+            alpha = torch.ones(16, 5, dtype=torch.float32)
             l_list.append(l_t)
+            #l_list (glimpse_num, agent_num, [batch_size, location])
+            """
+            print('l list', len(l_list))
+            print('l list[0]', len(l_list[0]))
+            print('l', l_list[0][0].shape)
+            print('imgs', imgs[0].shape)
+            print(imgs[0][0][0])
+            """ 
             b_list.append(b_t)
             log_pi_list.append(log_pi_t)
 
@@ -100,22 +109,25 @@ class train:
             predicted = torch.max(log_probs, 1)[1]  #indices store in element[1]
             reward = (predicted.detach() == torch.tensor(existence)).float()
             
-            reward_list.append(torch.sum(reward)/len(reward))
-            
             reward = self.weighted_reward(reward, alpha)
+            draw(imgs, l_list, existence, predicted.detach(), reward)
+            
+            reward_list.append(torch.sum(reward)/len(reward))
             reward = reward.unsqueeze(1).repeat(1,self.glimpse_num,1) 
                 #[batch_size, time_step, agent_num]
             advantage = reward - baselines.detach()
             
             loss_reinforce = torch.sum(-log_pi_all * advantage, dim=1)#sum along all glimpses
+            #loss_reinforce = torch.sum(-log_pi_all * 1, dim=1)#sum along all glimpses
+            
             loss_reinforce = torch.mean(loss_reinforce, dim=0).sum()#mean along all batch then sum up
             loss_baseline = F.mse_loss(baselines, reward)
             loss_action = F.nll_loss(log_probs, torch.tensor(existence))
             
-            loss = loss_action + loss_baseline - loss_reinforce*0.1
+            loss = loss_action - loss_reinforce + loss_baseline
             writer.add_scalar('action loss', loss_action.item(), iteration)
             writer.add_scalar('baseline loss', loss_baseline.item(), iteration)
-            writer.add_scalar('reinforce loss', 0.1*loss_reinforce.item(), iteration)
+            writer.add_scalar('reinforce loss', loss_reinforce.item(), iteration)
             """
             print('LOSS: ', 
                     'action:', loss_action.item(), 

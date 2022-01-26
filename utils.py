@@ -71,3 +71,56 @@ class Reshape(object):
             ims = ims.unsqueeze(0)
         return ims
 
+def denormalize(input_tensor):
+    inverse = transforms.Compose([transforms.Normalize((0.,0.,0.),
+                                                        (1/0.229, 1/0.224, 1/0.225)),
+                                transforms.Normalize((-0.485,-0.456,-0.406),
+                                                    (1.,1.,1.))])
+    return inverse(input_tensor)
+
+def draw_bbox(img, x, y, size, exist, pred, reward, i):
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    img = cv2.putText(img, 'class'+str(exist[0]), (20,20), font, 0.8, (0,0,255), 2)
+    img = cv2.putText(img, 'pred: '+str(pred[0].item()), (20,40), font, 0.8, (0,0,255), 2)
+    img = cv2.putText(img, 'reward: '+str(reward[0][0].item()), (20,60), font, 0.8, (0,0,255), 2)
+    if i == 0:
+        return cv2.rectangle(img, (x,y), (x+size, y+size), (255,0,0), 2)
+    if i == 1:
+        return cv2.rectangle(img, (x,y), (x+size, y+size), (0,255,0), 2)
+    if i == 2:
+        return cv2.rectangle(img, (x,y), (x+size, y+size), (0,0,255), 2)
+    if i == 3:
+        return cv2.rectangle(img, (x,y), (x+size, y+size), (255,255,255), 2)
+    if i == 4:
+        return cv2.rectangle(img, (x,y), (x+size, y+size), (0,0,0), 2)
+    if i == 5:
+        return cv2.rectangle(img, (x,y), (x+size, y+size), (128,128,128), 2)
+
+def draw(imgs, l_list, existence, predicted, reward):
+    #imgs: [batch_size,channel,width,height]
+    #l_list: [glimpse_size, agent_num, [batch_size, location]]
+    array = denormalize(imgs[0]).numpy()
+    maxval = array.max()
+    array = array*255/maxval
+    mat = np.uint8(array)
+    mat = mat.transpose(1,2,0)
+    mat = cv2.cvtColor(mat, cv2.COLOR_BGR2RGB)
+    mat_list = []
+    for i in range(2):
+        mat_list.append(mat.copy())
+    print('mat_shape: ', mat.shape)
+    for j in range(5):
+        x = round((l_list[0][j][0][0].item()/2+0.5)*800)
+        y = round((l_list[0][j][0][1].item()/2+0.5)*800)
+        draw_bbox(mat_list[0], x, y, 50, existence, predicted, reward, 0)
+    for j in range(5):
+        x = round((l_list[len(l_list)-1][j][0][0].item()/2+0.5)*800)
+        y = round((l_list[len(l_list)-1][j][0][1].item()/2+0.5)*800)
+        draw_bbox(mat_list[1], x, y, 50, existence, predicted, reward, 1)
+
+    output = mat_list[0]
+    for i in range(len(mat_list)-1):
+        output = np.hstack((output, mat_list[i+1]))
+    
+    cv2.imshow('img', output)
+    cv2.waitKey(1)
