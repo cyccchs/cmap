@@ -19,21 +19,7 @@ class MultiAgentRecurrentAttention(nn.Module):
         self.classifier = networks.ActionNetwork(hidden_size, 2)
         for i in range(self.agent_num):
             self.agents.append(Agent(h_g, h_l, glimpse_size, c, hidden_size, loc_dim, std))
-    """
-    def fun(self, a, grad_input, grad_output):
-        print('HELLO')
-        print('Inside ', self.__class__.__name__, ' backward')
-        print('Inside class:', self.__class__.__name__)
-        print('')
-        print('grad_input: ', type(grad_input))
-        print('grad_input[0]: ', type(grad_input[0]))
-        print('grad_output: ', type(grad_output))
-        print('grad_output[0]: ', type(grad_output[0]))
-        print('')
-        print('grad_input size:', grad_input[0].size())
-        print('grad_output size:', grad_output[0].size())
-        print('grad_input norm:', grad_input[0].norm())
-    """
+    
     def forward(self, img, h_t, l_t, last=False):
         g_list, b_list, l_list, log_pi_list = [], [], [], []
         
@@ -45,7 +31,6 @@ class MultiAgentRecurrentAttention(nn.Module):
         #alpha, z_t = self.softatt(g_list, h_t)
         #h_t = self.lstm(z_t)
         tempG = torch.cat(g_list, dim=0)
-        print(tempG.shape)
         
         for i in range(self.agent_num):
             log_pi, l_t = self.agents[i].location(s_t[i])
@@ -71,7 +56,6 @@ class MultiAgentRecurrentAttention(nn.Module):
             log_probas = self.classifier(tempG)
             log_probas = torch.mean(log_probas, dim=0)
             log_probas = log_probas.repeat(16,1)
-            print(log_probas.shape)
             return h_t, l_list, b_t, log_pi_t, log_probas#, alpha
         
         return h_t, l_list, b_t, log_pi_t

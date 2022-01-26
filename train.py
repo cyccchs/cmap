@@ -25,19 +25,19 @@ class train:
                     batch_size=self.batch_size,
                     num_workers=8,
                     collate_fn=self.collater,
-                    shuffle=False)
+                    shuffle=True)
 
         self.model = MultiAgentRecurrentAttention(
                     batch_size=self.batch_size,
                     agent_num = self.agent_num,
                     h_g = 128,
                     h_l = 128,
-                    glimpse_size = 9, 
+                    glimpse_size = 11, 
                     c = 3, 
                     lstm_size = 256, 
                     hidden_size = 256, 
                     loc_dim = 2, 
-                    std = 0.8)
+                    std = 0.2)
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.00001)
 
     def reset(self):
@@ -63,9 +63,10 @@ class train:
 
     def train(self):
         for epoch in range(self.epoch_num):
-            avg_acc, avg_loss = self.one_epoch(epoch)
+            avg_acc, avg_loss, avg_reward = self.one_epoch(epoch)
             writer.add_scalar('avg acc', avg_acc, epoch)
             writer.add_scalar('avg loss', avg_loss, epoch)
+            writer.add_scalar('avg_reward', avg_reward, epoch)
 
 
     def one_epoch(self, epoch):
@@ -74,7 +75,7 @@ class train:
         print('EPOCH:', epoch)
         l_t, h_t = self.reset()
         iteration = 0
-        acc_list, loss_list = [], []
+        acc_list, loss_list, reward_list = [], [], []
         pbar = tqdm(enumerate(self.loader), total=len(self.loader))
         for j, (ni,batch) in enumerate(pbar):
             imgs, existence = batch['image'], batch['existence']
@@ -82,7 +83,6 @@ class train:
             self.optimizer.zero_grad()
             
             for i in range(self.glimpse_num - 1):
-                print('glimpse num: ', i)
                 h_t, l_t, b_t, log_pi_t = self.model(imgs, h_t, l_t)
                 l_list.append(l_t)
                 b_list.append(b_t)
@@ -99,6 +99,9 @@ class train:
             baselines = torch.stack(b_list, dim=1) #[batch_size, time_step, agent_num]
             predicted = torch.max(log_probs, 1)[1]  #indices store in element[1]
             reward = (predicted.detach() == torch.tensor(existence)).float()
+            
+            reward_list.append(torch.sum(reward)/len(reward))
+            
             reward = self.weighted_reward(reward, alpha)
             reward = reward.unsqueeze(1).repeat(1,self.glimpse_num,1) 
                 #[batch_size, time_step, agent_num]
@@ -132,7 +135,7 @@ class train:
             self.optimizer.step()
             iteration = iteration + 1
             writer.flush()
-        return sum(acc_list)/len(acc_list), sum(loss_list)/len(loss_list)           
+        return sum(acc_list)/len(acc_list), sum(loss_list)/len(loss_list), sum(reward_list)/len(reward_list)           
 writer.close()
 
 if __name__ == '__main__':
