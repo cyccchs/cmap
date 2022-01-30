@@ -76,14 +76,18 @@ class HRSC2016(Dataset):
         with open(xmlName, 'r', encoding='utf-8-sig') as f:
             content = f.read()
             if self.binary:
-                if '<HRSC_Object>' in content:
-                    return 1
-                else:
+                if '<HRSC_Object>'  not in content:
                     return 0
+                objects = content.split('<HRSC_Object>')
+                info = objects.pop(0)
+                for obj in objects:
+                    cls_id = obj[obj.find('<Class_ID>')+10 : obj.find('</Class_ID>')]
+                    assert len(obj) != 0, 'No object found in %s' %xmlName
+                    if cls_id == '100000032':
+                        return 1
+                return 0
             else:
                 assert '<HRSC_Object>' in content, 'Background picture occured in %s' %xmlName
-            #if '<HRSC_Object>' not in content:
-            #    print(xmlName)
                 objects = content.split('<HRSC_Object>')
                 info = objects.pop(0)
                 for obj in objects:

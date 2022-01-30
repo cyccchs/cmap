@@ -24,9 +24,9 @@ class train:
         self.loader = DataLoader(
                     dataset=self.ds,
                     batch_size=self.batch_size,
-                    num_workers=8,
+                    num_workers=1,
                     collate_fn=self.collater,
-                    shuffle=True)
+                    shuffle=False)
 
         self.model = MultiAgentRecurrentAttention(
                     batch_size=self.batch_size,
@@ -39,7 +39,7 @@ class train:
                     hidden_size = 256, 
                     loc_dim = 2, 
                     std = 0.2)
-        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.0001)
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.001)
 
     def reset(self):
         
