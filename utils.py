@@ -96,7 +96,7 @@ def draw_bbox(img, x, y, size, exist, pred, reward, i):
     if i == 5:
         return cv2.rectangle(img, (x,y), (x+size, y+size), (128,128,128), 2)
 
-def draw(imgs, l_list, existence, predicted, reward):
+def draw(imgs, l_list, existence, predicted, reward, epoch):
     #imgs: [batch_size,channel,width,height]
     #l_list: [glimpse_size, agent_num, [batch_size, location]]
     array = denormalize(imgs[0]).numpy()
@@ -105,15 +105,15 @@ def draw(imgs, l_list, existence, predicted, reward):
     mat = np.uint8(array)
     mat = mat.transpose(1,2,0)
     mat = cv2.cvtColor(mat, cv2.COLOR_BGR2RGB)
+    mat_list = None
     mat_list = []
     for i in range(2):
         mat_list.append(mat.copy())
-    print('mat_shape: ', mat.shape)
-    for j in range(5):
+    for j in range(4):
         x = round((l_list[0][j][0][0].item()/2+0.5)*800)
         y = round((l_list[0][j][0][1].item()/2+0.5)*800)
         draw_bbox(mat_list[0], x, y, 50, existence, predicted, reward, 0)
-    for j in range(5):
+    for j in range(4):
         x = round((l_list[len(l_list)-1][j][0][0].item()/2+0.5)*800)
         y = round((l_list[len(l_list)-1][j][0][1].item()/2+0.5)*800)
         draw_bbox(mat_list[1], x, y, 50, existence, predicted, reward, 1)
@@ -122,5 +122,6 @@ def draw(imgs, l_list, existence, predicted, reward):
     for i in range(len(mat_list)-1):
         output = np.hstack((output, mat_list[i+1]))
     
-    cv2.imshow('img', output)
-    cv2.waitKey(1)
+#    cv2.imshow('img', output)
+#    cv2.waitKey(1)
+    cv2.imwrite('./results/'+str(epoch)+'.jpg', output)

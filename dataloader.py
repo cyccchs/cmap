@@ -83,9 +83,8 @@ class HRSC2016(Dataset):
                 for obj in objects:
                     cls_id = obj[obj.find('<Class_ID>')+10 : obj.find('</Class_ID>')]
                     assert len(obj) != 0, 'No object found in %s' %xmlName
-                    if cls_id == '100000032':
+                    if cls_id == '100000001':
                         return 1
-                    print(xmlName)
                 return 0
             else:
                 assert '<HRSC_Object>' in content, 'Background picture occured in %s' %xmlName
