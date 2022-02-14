@@ -20,7 +20,7 @@ class train:
         self.batch_size = 16
         self.glimpse_num = 4
         self.agent_num = 5
-        self.epoch_num = 20
+        self.epoch_num = 60
         self.loader = DataLoader(
                     dataset=self.ds,
                     batch_size=self.batch_size,
@@ -39,7 +39,7 @@ class train:
                     hidden_size = 256, 
                     loc_dim = 2, 
                     std = 0.2)
-        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.001)
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.0001)
 
     def reset(self):
         

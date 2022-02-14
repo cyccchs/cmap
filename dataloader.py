@@ -68,7 +68,7 @@ class HRSC2016(Dataset):
         with open(self.image_names_path) as f:
             image_name_list = [i.strip() for i in f.readlines()]
         return image_name_list
-    
+   #annotated image from 1~11 622~ 
     def _load_annotation(self, index):
         boxes, gt_classes = [], []
         root, name = os.path.split(index)
@@ -85,6 +85,7 @@ class HRSC2016(Dataset):
                     assert len(obj) != 0, 'No object found in %s' %xmlName
                     if cls_id == '100000032':
                         return 1
+                    print(xmlName)
                 return 0
             else:
                 assert '<HRSC_Object>' in content, 'Background picture occured in %s' %xmlName
