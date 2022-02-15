@@ -18,7 +18,7 @@ class train:
         self.ds = HRSC2016('./HRSC2016/Train/AllImages/image_names.txt')
         self.collater = Collater(scales=800)
         self.batch_size = 2
-        self.glimpse_num = 8
+        self.glimpse_num = 4
         self.agent_num = 4
         self.epoch_num = 10000
         self.loader = DataLoader(
