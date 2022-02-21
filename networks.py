@@ -24,7 +24,6 @@ class Retina:
         patch = []
         for i in range(b):
             patch.append(x[i, : , start[i, 1] : end[i, 1], start[i, 0] : end[i, 0]])
-        print(self.flatten(torch.stack(patch).get_device()))
         return self.flatten(torch.stack(patch))
 
     def flatten(self, input_tensor):
@@ -162,7 +161,7 @@ class SelfAttention(nn.Module):
         a_t = F.softmax(torch.matmul(k, q_trans)/256**0.5, dim=-1)
         #matmul (b, 4, 4), softmax (b, 4, 4)
         s_t = torch.matmul(a_t, v)
-
+        #s_t (b, agent_num, hidden_size)
         return s_t
 
 class SoftAttention(nn.Module):
