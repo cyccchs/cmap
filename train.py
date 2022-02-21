@@ -17,6 +17,10 @@ class train:
     def __init__(self):
         self.ds = HRSC2016('./HRSC2016/Train/AllImages/image_names.txt')
         self.collater = Collater(scales=800)
+        if torch.cuda.is_available():
+            self.device = torch.device('cuda')
+        else:
+            self.device = torch.device('cpu')
         self.batch_size = 2
         self.glimpse_num = 4
         self.agent_num = 4
@@ -39,16 +43,17 @@ class train:
                     hidden_size = 256, 
                     loc_dim = 2, 
                     std = 0.1)
+        self.model.to(self.device)
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.001)
 
     def reset(self):
         
         init_l_list = []
         for i in range(self.agent_num):
-            init_l = torch.FloatTensor(self.batch_size, 2).uniform_(-1.0,1.0) #batch size
+            init_l = torch.FloatTensor(self.batch_size, 2).uniform_(-1.0,1.0).to(self.device) #batch size
             init_l.requires_grad = True
             init_l_list.append(init_l)
-        init_h = torch.zeros(self.batch_size, 256, dtype=torch.float32, requires_grad=True) #lstm size
+        init_h = torch.zeros(self.batch_size, 256, dtype=torch.float32, device=self.device, requires_grad=True) #lstm size
         
         return init_l_list, init_h
 
@@ -80,6 +85,9 @@ class train:
         with tqdm(enumerate(self.loader), total=len(self.loader)) as pbar:
             for j, (ni,batch) in enumerate(pbar):
                 imgs, existence = batch['image'], batch['existence']
+                imgs = imgs.to(self.device)
+                print('device')
+                print(imgs.get_device())
                 l_list, b_list, log_pi_list = [], [], []
                 self.optimizer.zero_grad()
                 
