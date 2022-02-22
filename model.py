@@ -25,6 +25,7 @@ class MultiAgentRecurrentAttention(nn.Module):
         
         for i in range(self.agent_num):
             g_list.append(self.agents[i].glimpse_feature(img, l_t[i]))
+        #g_list: len = agent_num, [b, hidden_size] in each element size
         
         s_t = self.selfatt(g_list)
         s_t = torch.unbind(s_t, dim=1)

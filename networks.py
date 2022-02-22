@@ -153,13 +153,15 @@ class SelfAttention(nn.Module):
     
     def forward(self, g_list):
         G = torch.stack(g_list, dim=1)
+        #G:[b, agent_num, hidden_size]
         x = self.w(G)
         q = self.wq(x)
-        k = self.wk(x) #(b, 4, 256)
+        k = self.wk(x) #(b, agent_num, hidden_size)
         v = self.wv(x)
-        q_trans = torch.transpose(q, 1, 2) #(b, 256, 4)
-        a_t = F.softmax(torch.matmul(k, q_trans)/256**0.5, dim=-1)
-        #matmul (b, 4, 4), softmax (b, 4, 4)
+        q_trans = q.permute(0,2,1) #(b, hidden_size, agent_num)
+        a_t = F.softmax(torch.matmul(k, q_trans)/256**0.5, dim=0)
+        print(a_t.shape)
+        #matmul (b, agent_num, agent_num), softmax (b, agent_num, agent_num)
         s_t = torch.matmul(a_t, v)
         #s_t (b, agent_num, hidden_size)
         return s_t
