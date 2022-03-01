@@ -56,6 +56,7 @@ class MultiAgentRecurrentAttention(nn.Module):
             #log_probas = self.classifier(h_t)
             log_probas = self.classifier(tempG)
             log_probas = torch.mean(log_probas, dim=0)
+            print(log_probas.shape)
             log_probas = log_probas.repeat(3,1)
             return h_t, l_list, b_t, log_pi_t, log_probas#, alpha
         

@@ -95,7 +95,6 @@ class LocationNetwork(nn.Module):
         l_t = l_t.detach()
         log_pi = Normal(mu, self.std).log_prob(l_t)
         log_pi = torch.sum(log_pi, dim=1)
-        print(log_pi.shape)
         l_t = torch.clamp(l_t, -1, 1)
 
         return log_pi, l_t
