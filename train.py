@@ -21,7 +21,7 @@ class train:
             self.device = torch.device('cuda')
         else:
             self.device = torch.device('cpu')
-        self.batch_size = 2
+        self.batch_size = 3
         self.glimpse_num = 5
         self.agent_num = 4
         self.epoch_num = 10000

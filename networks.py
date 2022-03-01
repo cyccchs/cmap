@@ -94,8 +94,8 @@ class LocationNetwork(nn.Module):
         l_t = Normal(mu, self.std).rsample()
         l_t = l_t.detach()
         log_pi = Normal(mu, self.std).log_prob(l_t)
-
         log_pi = torch.sum(log_pi, dim=1)
+        print(log_pi.shape)
         l_t = torch.clamp(l_t, -1, 1)
 
         return log_pi, l_t
@@ -160,7 +160,6 @@ class SelfAttention(nn.Module):
         v = self.wv(x)
         q_trans = q.permute(0,2,1) #(b, hidden_size, agent_num)
         a_t = F.softmax(torch.matmul(k, q_trans)/256**0.5, dim=0)
-        print(a_t.shape)
         #matmul (b, agent_num, agent_num), softmax (b, agent_num, agent_num)
         s_t = torch.matmul(a_t, v)
         #s_t (b, agent_num, hidden_size)

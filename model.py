@@ -28,7 +28,7 @@ class MultiAgentRecurrentAttention(nn.Module):
         #g_list: len = agent_num, [b, hidden_size] in each element size
         
         s_t = self.selfatt(g_list)
-        s_t = torch.unbind(s_t, dim=1)
+        s_t = torch.unbind(s_t, dim=1) # s_t: agent_num*(batch_size, hidden_size)
         #alpha, z_t = self.softatt(g_list, h_t)
         #h_t = self.lstm(z_t)
         tempG = torch.cat(g_list, dim=0)
@@ -56,7 +56,7 @@ class MultiAgentRecurrentAttention(nn.Module):
             #log_probas = self.classifier(h_t)
             log_probas = self.classifier(tempG)
             log_probas = torch.mean(log_probas, dim=0)
-            log_probas = log_probas.repeat(2,1)
+            log_probas = log_probas.repeat(3,1)
             return h_t, l_list, b_t, log_pi_t, log_probas#, alpha
         
         return h_t, l_list, b_t, log_pi_t
