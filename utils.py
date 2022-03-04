@@ -112,16 +112,16 @@ def draw(imgs, l_list, existence, predicted, reward, epoch):
     for j in range(4):
         x = round((l_list[0][j][0][0].item()/2+0.5)*800)
         y = round((l_list[0][j][0][1].item()/2+0.5)*800)
-        draw_bbox(mat_list[0], x, y, 50, existence, predicted, reward, 0)
+        draw_bbox(mat_list[0], x, y, 200, existence, predicted, reward, 0)
     for j in range(4):
         x = round((l_list[len(l_list)-1][j][0][0].item()/2+0.5)*800)
         y = round((l_list[len(l_list)-1][j][0][1].item()/2+0.5)*800)
-        draw_bbox(mat_list[1], x, y, 50, existence, predicted, reward, 1)
+        draw_bbox(mat_list[1], x, y, 200, existence, predicted, reward, 1)
 
     output = mat_list[0]
     for i in range(len(mat_list)-1):
         output = np.hstack((output, mat_list[i+1]))
     
-#    cv2.imshow('img', output)
-#    cv2.waitKey(1)
+    cv2.imshow('img', output)
+    cv2.waitKey(1)
     cv2.imwrite('./results/'+str(epoch)+'.jpg', output)

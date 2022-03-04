@@ -41,7 +41,7 @@ class GlimpseNetwork(nn.Module):
         h_g: hidden layer for glimpse
         h_l: hidden layer for location
         l_pre: location(l) of previous time step
-        """
+    """
     
     def __init__(self, h_g, h_l, glimpse_size, c):
         super().__init__()
@@ -95,7 +95,6 @@ class LocationNetwork(nn.Module):
         l_t = l_t.detach()
         log_pi = Normal(mu, self.std).log_prob(l_t)
         log_pi = torch.sum(log_pi, dim=1)
-        print(log_pi.shape)
         l_t = torch.clamp(l_t, -1, 1)
 
         return log_pi, l_t
@@ -144,12 +143,12 @@ class CoreNetwork(nn.Module): #CCI(LSTM cell)
 
 class SelfAttention(nn.Module):
     
-    def __init__(self):
+    def __init__(self, hidden_size):
         super().__init__()
-        self.w = nn.Linear(256, 256)
-        self.wq = nn.Linear(256, 256)
-        self.wk = nn.Linear(256, 256)
-        self.wv = nn.Linear(256, 256)
+        self.w = nn.Linear(hidden_size, hidden_size)
+        self.wq = nn.Linear(hidden_size, hidden_size)
+        self.wk = nn.Linear(hidden_size, hidden_size)
+        self.wv = nn.Linear(hidden_size, hidden_size)
     
     def forward(self, g_list):
         G = torch.stack(g_list, dim=1)
@@ -167,7 +166,7 @@ class SelfAttention(nn.Module):
 
 class SoftAttention(nn.Module):
     
-    def __init__(self):
+    def __init__(self, hidden_size):
         super().__init__()
         self.wk = nn.Linear(256, 256)
         self.wq = nn.Linear(256, 256)
@@ -208,7 +207,7 @@ class ActionNetwork(nn.Module):
     def __init__(self, input_size, output_size):
         super().__init__()
 
-        self.fc = nn.Linear(input_size, output_size)
+        self.fc = nn.Linear(4096, output_size)
 
     def forward(self, h_t):
         action = F.log_softmax(self.fc(h_t), dim=1)

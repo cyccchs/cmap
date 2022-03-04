@@ -10,7 +10,6 @@ import torch.nn.functional as F
 import matplotlib.pyplot as plt
 from torch.utils.tensorboard import SummaryWriter
 
-torch.autograd.set_detect_anomaly(True)
 writer = SummaryWriter()
 gpu = False
 class train:
@@ -35,14 +34,14 @@ class train:
         self.model = MultiAgentRecurrentAttention(
                     batch_size=self.batch_size,
                     agent_num = self.agent_num,
-                    h_g = 128,
-                    h_l = 128,
-                    glimpse_size = 50, 
+                    h_g = 512,
+                    h_l = 512,
+                    glimpse_size = 200, 
                     c = 3, 
                     lstm_size = 256, 
-                    hidden_size = 256, 
+                    hidden_size = 1024, 
                     loc_dim = 2, 
-                    std = 0.1)
+                    std = 0.2)
         self.model.to(self.device)
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.001)
 
@@ -113,11 +112,10 @@ class train:
                 log_pi_all = torch.stack(log_pi_list, dim=1) #[batch_size, time_step, agent_num]
                 baselines = torch.stack(b_list, dim=1) #[batch_size, time_step, agent_num]
                 predicted = torch.max(log_probs, 1)[1]  #indices store in element[1]
-                reward = (predicted.detach() == torch.tensor(existence)).float()
+                reward = (predicted.detach() == torch.tensor(existence).detach()).float()
                 
                 reward = self.weighted_reward(reward, alpha)
-                if epoch%2 == 0:
-                    draw(imgs, l_list, existence, predicted.detach(), reward, epoch)
+                draw(imgs, l_list, existence, predicted.detach(), reward, epoch)
                 
                 reward_list.append(torch.sum(reward)/len(reward))
                 reward = reward.unsqueeze(1).repeat(1,self.glimpse_num,1) 
@@ -143,13 +141,12 @@ class train:
                 print(predicted)
                 print('LOSS: ', loss.item())
                 """
-                correct = (predicted==torch.tensor(existence)).float()
+                correct = (predicted.detach()==torch.tensor(existence).detach()).float()
                 acc = 100*(correct.sum()/len(existence))
                 acc_list.append(acc)
                 loss_list.append(loss)
 
                 writer.add_scalar('accuracy', acc, iteration)
-                #print('ACC', acc)
                 loss.backward()
                 self.optimizer.step()
                 iteration = iteration + 1
