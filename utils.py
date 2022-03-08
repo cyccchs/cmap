@@ -84,19 +84,11 @@ def draw_bbox(img, x, y, size, exist, pred, reward, i):
     img = cv2.putText(img, 'pred: '+str(pred[0].item()), (20,40), font, 0.8, (0,0,255), 2)
     img = cv2.putText(img, 'reward: '+str(reward[0][0].item()), (20,60), font, 0.8, (0,0,255), 2)
     if i == 0:
-        return cv2.rectangle(img, (x,y), (x+size, y+size), (255,0,0), 2)
+        return cv2.rectangle(img, (round(x-size/2),round(y-size/2)), (round(x+size/2), round(y+size/2)), (255,0,0), 2)
     if i == 1:
-        return cv2.rectangle(img, (x,y), (x+size, y+size), (0,255,0), 2)
-    if i == 2:
-        return cv2.rectangle(img, (x,y), (x+size, y+size), (0,0,255), 2)
-    if i == 3:
-        return cv2.rectangle(img, (x,y), (x+size, y+size), (255,255,255), 2)
-    if i == 4:
-        return cv2.rectangle(img, (x,y), (x+size, y+size), (0,0,0), 2)
-    if i == 5:
-        return cv2.rectangle(img, (x,y), (x+size, y+size), (128,128,128), 2)
+        return cv2.rectangle(img, (round(x-size/2),round(y-size/2)), (round(x+size/2), round(y+size/2)), (0,255,0), 2)
 
-def draw(imgs, l_list, existence, predicted, reward, epoch):
+def draw(imgs, l_list, existence, predicted, reward, epoch, size):
     #imgs: [batch_size,channel,width,height]
     #l_list: [glimpse_size, agent_num, [batch_size, location]]
     array = denormalize(imgs[0]).numpy()
@@ -109,14 +101,14 @@ def draw(imgs, l_list, existence, predicted, reward, epoch):
     mat_list = []
     for i in range(2):
         mat_list.append(mat.copy())
-    for j in range(4):
+    for j in range(2):
         x = round((l_list[0][j][0][0].item()/2+0.5)*800)
         y = round((l_list[0][j][0][1].item()/2+0.5)*800)
-        draw_bbox(mat_list[0], x, y, 200, existence, predicted, reward, 0)
-    for j in range(4):
+        draw_bbox(mat_list[0], x, y, size, existence, predicted, reward, 0)
+    for j in range(2):
         x = round((l_list[len(l_list)-1][j][0][0].item()/2+0.5)*800)
         y = round((l_list[len(l_list)-1][j][0][1].item()/2+0.5)*800)
-        draw_bbox(mat_list[1], x, y, 200, existence, predicted, reward, 1)
+        draw_bbox(mat_list[1], x, y, size, existence, predicted, reward, 1)
 
     output = mat_list[0]
     for i in range(len(mat_list)-1):

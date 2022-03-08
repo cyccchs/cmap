@@ -14,16 +14,17 @@ writer = SummaryWriter()
 gpu = False
 class train:
     def __init__(self):
-        self.ds = HRSC2016('./HRSC2016/Train/AllImages/image_names.txt')
+        self.ds = HRSC2016('./HRSC2016/grayscale_test/AllImages/image_names.txt')
         self.collater = Collater(scales=800)
         if gpu and torch.cuda.is_available():
             self.device = torch.device('cuda')
         else:
             self.device = torch.device('cpu')
-        self.batch_size = 3
-        self.glimpse_num = 5
-        self.agent_num = 4
+        self.batch_size = 2
+        self.glimpse_num = 3
+        self.agent_num = 2
         self.epoch_num = 10000
+        self.glimpse_size = 400
         self.loader = DataLoader(
                     dataset=self.ds,
                     batch_size=self.batch_size,
@@ -34,14 +35,14 @@ class train:
         self.model = MultiAgentRecurrentAttention(
                     batch_size=self.batch_size,
                     agent_num = self.agent_num,
-                    h_g = 512,
-                    h_l = 512,
-                    glimpse_size = 200, 
+                    h_g = 256,
+                    h_l = 256,
+                    glimpse_size = self.glimpse_size, 
                     c = 3, 
                     lstm_size = 256, 
-                    hidden_size = 1024, 
+                    hidden_size = 512, 
                     loc_dim = 2, 
-                    std = 0.2)
+                    std = 0.00001)
         self.model.to(self.device)
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.001)
 
@@ -113,26 +114,27 @@ class train:
                 baselines = torch.stack(b_list, dim=1) #[batch_size, time_step, agent_num]
                 predicted = torch.max(log_probs, 1)[1]  #indices store in element[1]
                 reward = (predicted.detach() == torch.tensor(existence).detach()).float()
-                
                 reward = self.weighted_reward(reward, alpha)
-                draw(imgs, l_list, existence, predicted.detach(), reward, epoch)
+                draw(imgs, l_list, existence, predicted.detach(), reward, epoch, self.glimpse_size)
                 
                 reward_list.append(torch.sum(reward)/len(reward))
                 reward = reward.unsqueeze(1).repeat(1,self.glimpse_num,1) 
-                    #[batch_size, time_step, agent_num]
+                #reward[batch_size, time_step, agent_num]
                 advantage = reward - baselines.detach()
                 
                 loss_reinforce = torch.sum(-log_pi_all * advantage, dim=1)#sum along all glimpses
                 #loss_reinforce = torch.sum(-log_pi_all * 1, dim=1)#sum along all glimpses
                 
-                loss_reinforce = torch.mean(loss_reinforce, dim=0).sum()#mean along all batch then sum up
+                loss_reinforce = torch.mean(loss_reinforce, dim=0).sum()
+                #mean along all batch then sum up
                 loss_baseline = F.mse_loss(baselines, reward)
                 loss_action = F.nll_loss(log_probs, torch.tensor(existence))
                 
-                loss = loss_action - loss_reinforce + loss_baseline
+                #loss = loss_action - loss_reinforce*0.01 + loss_baseline
+                loss = loss_action*10
                 writer.add_scalar('action loss', loss_action.item(), iteration)
                 writer.add_scalar('baseline loss', loss_baseline.item(), iteration)
-                writer.add_scalar('reinforce loss', loss_reinforce.item(), iteration)
+                writer.add_scalar('reinforce loss', loss_reinforce.item()*0.01, iteration)
                 """
                 print('LOSS: ', 
                         'action:', loss_action.item(), 

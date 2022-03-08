@@ -91,7 +91,8 @@ class LocationNetwork(nn.Module):
     def forward(self, s_t):
         mu = torch.tanh(self.fc(s_t))
 
-        l_t = Normal(mu, self.std).rsample()
+        #l_t = Normal(mu, self.std).rsample()
+        l_t = torch.tensor([[0.75, -0.75],[0.75, -0.75]])
         l_t = l_t.detach()
         log_pi = Normal(mu, self.std).log_prob(l_t)
         log_pi = torch.sum(log_pi, dim=1)
@@ -207,7 +208,7 @@ class ActionNetwork(nn.Module):
     def __init__(self, input_size, output_size):
         super().__init__()
 
-        self.fc = nn.Linear(4096, output_size)
+        self.fc = nn.Linear(1024, output_size)
 
     def forward(self, h_t):
         action = F.log_softmax(self.fc(h_t), dim=1)
