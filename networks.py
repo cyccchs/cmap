@@ -61,9 +61,7 @@ class GlimpseNetwork(nn.Module):
         self.to(device)
 
     def forward(self, x, l_prev):
-        print(x.get_device())
         glimpse = self.retina.extract_patch(x, l_prev)
-        print(glimpse.get_device())
         l_prev = l_prev.view(l_prev.size(0), -1)
 
         g_out = F.relu(self.fc1(glimpse))

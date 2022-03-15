@@ -22,8 +22,8 @@ class train:
         else:
             self.device = torch.device('cpu')
         self.batch_size = 2
-        self.glimpse_num = 2
-        self.agent_num = 8
+        self.glimpse_num = 6
+        self.agent_num = 4
         self.epoch_num = 10000
         self.glimpse_size = 100
         self.loader = DataLoader(
@@ -95,7 +95,6 @@ class train:
                 imgs, existence = batch['image'], batch['existence']
                 imgs = imgs.to(self.device)
                 existence = torch.tensor(existence).detach()
-                print(existence)
                 existence = existence.to(self.device)
                 l_list, b_list, log_pi_list = [], [], []
                 self.optimizer.zero_grad()
@@ -119,7 +118,7 @@ class train:
                 predicted = torch.max(log_probs, 1)[1]  #indices store in element[1]
                 reward = (predicted.detach() == torch.tensor(existence).detach()).float()
                 reward = self.weighted_reward(reward, alpha).to(self.device)
-                draw(imgs, l_list, existence, predicted.detach(), reward, epoch, self.glimpse_size)
+                draw(imgs, l_list, existence, predicted.detach(), reward, epoch, self.glimpse_size, self.agent_num)
                 
                 reward_list.append(torch.sum(reward)/len(reward))
                 reward = reward.unsqueeze(1).repeat(1,self.glimpse_num,1) 
