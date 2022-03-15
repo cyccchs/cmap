@@ -6,19 +6,19 @@ from agent import Agent
 debug = False
 
 class MultiAgentRecurrentAttention(nn.Module):
-    def __init__(self, batch_size, agent_num, h_g, h_l, glimpse_size, c, lstm_size, hidden_size, loc_dim, std):
+    def __init__(self, batch_size, agent_num, h_g, h_l, glimpse_size, c, lstm_size, hidden_size, loc_dim, std, device):
         super().__init__()
         self.agents = []
         self.agent_num = agent_num
         self.batch_size = batch_size
         self.lstm_size = lstm_size
         self.selfatt = networks.SelfAttention(hidden_size)
-        self.softatt = networks.SoftAttention(hidden_size)
-        #self.lstm = networks.CoreNetwork(batch_size, lstm_size)
+        self.softatt = networks.SoftAttention(hidden_size, device)
+        self.lstm = networks.CoreNetwork(batch_size, lstm_size, device)
         #self.lstm.register_backward_hook(self.fun)
         self.classifier = networks.ActionNetwork(hidden_size, 2)
         for i in range(self.agent_num):
-            self.agents.append(Agent(h_g, h_l, glimpse_size, c, hidden_size, loc_dim, std))
+            self.agents.append(Agent(h_g, h_l, glimpse_size, c, hidden_size, loc_dim, std, device))
     
     def forward(self, img, h_t, l_t, last=False):
         g_list, b_list, l_list, log_pi_list = [], [], [], []
@@ -29,9 +29,9 @@ class MultiAgentRecurrentAttention(nn.Module):
         
         s_t = self.selfatt(g_list)
         s_t = torch.unbind(s_t, dim=1) # s_t: agent_num*(batch_size, hidden_size)
-        #alpha, z_t = self.softatt(g_list, h_t)
-        #h_t = self.lstm(z_t)
-        tempG = torch.cat(g_list, dim=1)
+        alpha, z_t = self.softatt(g_list, h_t)
+        h_t = self.lstm(z_t)
+        #tempG = torch.cat(g_list, dim=1)
         #tempG: (batch_size, agent_num*hidden_size)
         
         for i in range(self.agent_num):
@@ -54,10 +54,10 @@ class MultiAgentRecurrentAttention(nn.Module):
             print('log_pi', log_pi.shape)
         
         if last:
-            #log_probas = self.classifier(h_t)
-            log_probas = self.classifier(tempG)
+            log_probas = self.classifier(h_t)
+            #log_probas = self.classifier(tempG)
             #log_probas: (batch_size, class_num)
-            return h_t, l_list, b_t, log_pi_t, log_probas#, alpha
+            return h_t, l_list, b_t, log_pi_t, log_probas, alpha
         
         return h_t, l_list, b_t, log_pi_t
 

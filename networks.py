@@ -27,7 +27,10 @@ class Retina:
         return self.flatten(torch.stack(patch))
 
     def flatten(self, input_tensor):
-        return input_tensor[0].view(-1)
+        flat = []
+        for i in range(input_tensor.shape[0]):
+            flat.append(input_tensor[i].view(-1))
+        return torch.stack(flat)
 
     def denormalize(self, T, coords):
         """
@@ -43,7 +46,7 @@ class GlimpseNetwork(nn.Module):
         l_pre: location(l) of previous time step
     """
     
-    def __init__(self, h_g, h_l, glimpse_size, c):
+    def __init__(self, h_g, h_l, glimpse_size, c, device):
         super().__init__()
         self.retina = Retina(glimpse_size)
 
@@ -55,9 +58,12 @@ class GlimpseNetwork(nn.Module):
 
         self.fc3 = nn.Linear(h_g, h_g + h_l)
         self.fc4 = nn.Linear(h_l, h_g + h_l)
+        self.to(device)
 
     def forward(self, x, l_prev):
+        print(x.get_device())
         glimpse = self.retina.extract_patch(x, l_prev)
+        print(glimpse.get_device())
         l_prev = l_prev.view(l_prev.size(0), -1)
 
         g_out = F.relu(self.fc1(glimpse))
@@ -82,21 +88,29 @@ class LocationNetwork(nn.Module):
         l_t: 2D vector of shape(B,2)
     """
     
-    def __init__(self, input_size, output_size, std):
+    def __init__(self, input_size, output_size, std, device):
         super().__init__()
 
         self.std = std
         self.fc = nn.Linear(input_size, output_size)
+        self.to(device)
 
     def forward(self, s_t):
+        #feat = F.relu(self.fc(s_t.detach()))
         mu = torch.tanh(self.fc(s_t))
+        #l_t  = self.fc(s_t)
+        #l_t = torch.clamp(l_t, -1, 1)
 
-        #l_t = Normal(mu, self.std).rsample()
-        l_t = torch.tensor([[0.75, -0.75],[0.75, -0.75]])
+        l_t = Normal(mu, self.std).rsample()
+        #l_t = -2 * torch.rand(2,2) + 1
+        #l_t = torch.tensor([[0.75, -0.75],[0.75, -0.75],[0.75, -0.75]])
+        #l_t = torch.tensor([[0.75, -0.75],[0.75, -0.75]])
         l_t = l_t.detach()
-        log_pi = Normal(mu, self.std).log_prob(l_t)
+        #log_pi = Normal(mu, self.std).log_prob(l_t)
+        log_pi = Normal(l_t, self.std).log_prob(l_t)
         log_pi = torch.sum(log_pi, dim=1)
         l_t = torch.clamp(l_t, -1, 1)
+        #l_t = torch.tanh(l_t)
 
         return log_pi, l_t
 
@@ -108,10 +122,11 @@ class BaselineNetwork(nn.Module):
 
         b_t: 2D vector of shape (B, 1). The baseline for the current time step 't'
     """
-    def __init__(self, input_size, output_size):
+    def __init__(self, input_size, output_size, device):
         super().__init__()
 
         self.fc = nn.Linear(input_size, output_size)
+        self.to(device)
 
     def forward(self, s_t):
         b = self.fc(s_t.detach())
@@ -130,12 +145,12 @@ class CoreNetwork(nn.Module): #CCI(LSTM cell)
 
         h_t: 2D tensor of shape (B, hidden_size). Hidden state for current timestep.
     """
-    def __init__(self, batch_size, lstm_size):
+    def __init__(self, batch_size, lstm_size, device):
         super().__init__()
 
         self.lstm = nn.LSTMCell(lstm_size, lstm_size)
-        self.h = torch.zeros(batch_size, lstm_size, dtype=torch.float32, requires_grad=True)
-        self.c = torch.zeros(batch_size, lstm_size, dtype=torch.float32, requires_grad=True)
+        self.h = torch.zeros(batch_size, lstm_size, dtype=torch.float32, requires_grad=True, device=device)
+        self.c = torch.zeros(batch_size, lstm_size, dtype=torch.float32, requires_grad=True, device=device)
     def forward(self, z_t):
          
         self.h, self.c = self.lstm(z_t, (self.h,self.c))
@@ -146,6 +161,7 @@ class SelfAttention(nn.Module):
     
     def __init__(self, hidden_size):
         super().__init__()
+        self.size = hidden_size
         self.w = nn.Linear(hidden_size, hidden_size)
         self.wq = nn.Linear(hidden_size, hidden_size)
         self.wk = nn.Linear(hidden_size, hidden_size)
@@ -159,7 +175,7 @@ class SelfAttention(nn.Module):
         k = self.wk(x) #(b, agent_num, hidden_size)
         v = self.wv(x)
         q_trans = q.permute(0,2,1) #(b, hidden_size, agent_num)
-        a_t = F.softmax(torch.matmul(k, q_trans)/256**0.5, dim=0)
+        a_t = F.softmax(torch.matmul(k, q_trans)/self.size**0.5, dim=0)
         #matmul (b, agent_num, agent_num), softmax (b, agent_num, agent_num)
         s_t = torch.matmul(a_t, v)
         #s_t (b, agent_num, hidden_size)
@@ -167,11 +183,12 @@ class SelfAttention(nn.Module):
 
 class SoftAttention(nn.Module):
     
-    def __init__(self, hidden_size):
+    def __init__(self, hidden_size, device):
         super().__init__()
-        self.wk = nn.Linear(256, 256)
-        self.wq = nn.Linear(256, 256)
-        self.wg = nn.Linear(256, 1)
+        self.wk = nn.Linear(hidden_size, hidden_size)
+        self.wq = nn.Linear(hidden_size, hidden_size)
+        self.wg = nn.Linear(hidden_size, 1)
+        self.device = device
     
     def forward(self, g_list, h_t):
         G = torch.stack(g_list) # to represent 4 agents' g_t
@@ -179,7 +196,7 @@ class SoftAttention(nn.Module):
         m_list = [self.wg(y_list[i]) for i in range(len(G))]
         m_concat = torch.cat([m_list[i] for i in range(len(G))], dim=1)
         alpha = F.softmax(m_concat, dim=-1)
-        z_list = [torch.mul(G[i], torch.index_select(alpha, 1, torch.tensor(i))) for i in range(len(G))]
+        z_list = [torch.mul(G[i], torch.index_select(alpha, 1, torch.tensor(i).to(self.device))) for i in range(len(G))]
         z_stack = torch.stack(z_list, 2)
         z_t = torch.sum(z_stack, 2) #similar to reduce_sum
 
@@ -208,8 +225,9 @@ class ActionNetwork(nn.Module):
     def __init__(self, input_size, output_size):
         super().__init__()
 
-        self.fc = nn.Linear(1024, output_size)
+        self.fc = nn.Linear(input_size, output_size)
 
     def forward(self, h_t):
         action = F.log_softmax(self.fc(h_t), dim=1)
+        
         return action

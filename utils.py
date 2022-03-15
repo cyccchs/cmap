@@ -91,6 +91,11 @@ def draw_bbox(img, x, y, size, exist, pred, reward, i):
 def draw(imgs, l_list, existence, predicted, reward, epoch, size):
     #imgs: [batch_size,channel,width,height]
     #l_list: [glimpse_size, agent_num, [batch_size, location]]
+    imgs = imgs.cpu()
+    existence = existence.cpu().numpy()
+    predictde = predicted.cpu()
+    reward = reward.cpu()
+
     array = denormalize(imgs[0]).numpy()
     maxval = array.max()
     array = array*255/maxval
@@ -101,11 +106,11 @@ def draw(imgs, l_list, existence, predicted, reward, epoch, size):
     mat_list = []
     for i in range(2):
         mat_list.append(mat.copy())
-    for j in range(2):
+    for j in range(8):
         x = round((l_list[0][j][0][0].item()/2+0.5)*800)
         y = round((l_list[0][j][0][1].item()/2+0.5)*800)
         draw_bbox(mat_list[0], x, y, size, existence, predicted, reward, 0)
-    for j in range(2):
+    for j in range(8):
         x = round((l_list[len(l_list)-1][j][0][0].item()/2+0.5)*800)
         y = round((l_list[len(l_list)-1][j][0][1].item()/2+0.5)*800)
         draw_bbox(mat_list[1], x, y, size, existence, predicted, reward, 1)
