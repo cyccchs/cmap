@@ -143,6 +143,7 @@ class CoreNetwork(nn.Module): #CCI(LSTM cell)
 
         h_t: 2D tensor of shape (B, hidden_size). Hidden state for current timestep.
     """
+    """
     def __init__(self, batch_size, lstm_size, device):
         super().__init__()
 
@@ -153,7 +154,18 @@ class CoreNetwork(nn.Module): #CCI(LSTM cell)
          
         self.h, self.c = self.lstm(z_t, (self.h,self.c))
         
-        return self.h.detach()
+        return self.h
+    """
+    def __init__(self, input_size, hidden_size):
+        super().__init__()
+        self.i2h = nn.Linear(input_size, hidden_size)
+        self.h2h = nn.Linear(hidden_size, hidden_size)
+    def forward(self, z_t, h_t_prev):
+        h1 = self.i2h(z_t)
+        h2 = self.h2h(h_t_prev)
+        h_t = F.relu(h1 + h2)
+        
+        return h_t
 
 class SelfAttention(nn.Module):
     

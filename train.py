@@ -12,6 +12,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 writer = SummaryWriter()
 gpu = True
+torch.autograd.set_detect_anomaly(True)
 class train:
     def __init__(self):
         #self.ds = HRSC2016('./HRSC2016/Train/AllImages/image_names.txt')
@@ -23,7 +24,7 @@ class train:
             self.device = torch.device('cpu')
         self.batch_size = 2
         self.glimpse_num = 6
-        self.agent_num = 4
+        self.agent_num = 8
         self.epoch_num = 10000
         self.glimpse_size = 100
         self.loader = DataLoader(
@@ -38,7 +39,8 @@ class train:
                     agent_num = self.agent_num,
                     h_g = 128,
                     h_l = 128,
-                    glimpse_size = self.glimpse_size, 
+                    glimpse_size = self.glimpse_size,
+                    glimpse_num = self.glimpse_num,
                     c = 3, 
                     lstm_size = 256, 
                     hidden_size = 256, 
@@ -48,17 +50,6 @@ class train:
         self.model.to(self.device)
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.001)
 
-    def reset(self):
-        
-        init_l_list = []
-        for i in range(self.agent_num):
-            #init_l = torch.FloatTensor(self.batch_size, 2).uniform_(-1.0,1.0).to(self.device)
-            init_l = (-2 * torch.rand(2, 2) + 1).to(self.device)
-            init_l.requires_grad = True
-            init_l_list.append(init_l)
-        init_h = torch.zeros(self.batch_size, 256, dtype=torch.float32, device=self.device, requires_grad=True) #lstm size
-        
-        return init_l_list, init_h
 
     def weighted_reward(self, reward, alpha):
         reward_list = []
@@ -86,7 +77,6 @@ class train:
 
         self.model.train()
         print('EPOCH:', epoch)
-        l_t, h_t = self.reset()
         iteration = 0
         acc_list, loss_list, reward_list = [], [], []
         loss_rl, loss_act, loss_base = [], [], []
@@ -96,29 +86,17 @@ class train:
                 imgs = imgs.to(self.device)
                 existence = torch.tensor(existence).detach()
                 existence = existence.to(self.device)
-                l_list, b_list, log_pi_list = [], [], []
                 self.optimizer.zero_grad()
                 
-                for i in range(self.glimpse_num - 1):
-                    h_t, l_t, b_t, log_pi_t = self.model(imgs, h_t, l_t)
-                    l_list.append(l_t)
-                    b_list.append(b_t)
-                    log_pi_list.append(log_pi_t)
-                
-                h_t, l_t, b_t, log_pi, log_probs, alpha = self.model(imgs, h_t, l_t, last=True)
-                #h_t, l_t, b_t, log_pi_t, log_probs = self.model(imgs, h_t, l_t, last=True)
-                alpha = torch.ones(self.batch_size, self.agent_num, dtype=torch.float32)
-                
-                l_list.append(l_t)#l_list (glimpse_num, agent_num, [batch_size, location])
-                b_list.append(b_t)
-                log_pi_list.append(log_pi_t)
+                l_list, b_list, log_pi_list, log_probs, alpha = self.model(imgs)
 
                 log_pi_all = torch.stack(log_pi_list, dim=1) #[batch_size, time_step, agent_num]
                 baselines = torch.stack(b_list, dim=1) #[batch_size, time_step, agent_num]
                 predicted = torch.max(log_probs, 1)[1]  #indices store in element[1]
                 reward = (predicted.detach() == torch.tensor(existence).detach()).float()
                 reward = self.weighted_reward(reward, alpha).to(self.device)
-                draw(imgs, l_list, existence, predicted.detach(), reward, epoch, self.glimpse_size, self.agent_num)
+                
+                draw(imgs, l_list, existence, predicted, reward, epoch, self.glimpse_size, self.agent_num)
                 
                 reward_list.append(torch.sum(reward)/len(reward))
                 reward = reward.unsqueeze(1).repeat(1,self.glimpse_num,1) 
@@ -135,9 +113,6 @@ class train:
                 loss_reinforce = loss_reinforce*0.01
                 loss = loss_action + loss_reinforce + loss_baseline
                 #loss = loss_action + loss_reinforce*0.001
-                #writer.add_scalar('action loss', loss_action.item(), iteration)
-                #writer.add_scalar('baseline loss', loss_baseline.item(), iteration)
-                #writer.add_scalar('reinforce loss', loss_reinforce.item()*0.001, iteration)
                 
                 correct = (predicted.detach()==torch.tensor(existence).detach()).float()
                 acc = 100*(correct.sum()/len(existence))

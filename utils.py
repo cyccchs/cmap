@@ -93,7 +93,7 @@ def draw(imgs, l_list, existence, predicted, reward, epoch, size, agent_num):
     #l_list: [glimpse_size, agent_num, [batch_size, location]]
     imgs = imgs.cpu()
     existence = existence.cpu().numpy()
-    predictde = predicted.cpu()
+    predicted = predicted.cpu().detach()
     reward = reward.cpu()
 
     array = denormalize(imgs[0]).numpy()
@@ -102,7 +102,6 @@ def draw(imgs, l_list, existence, predicted, reward, epoch, size, agent_num):
     mat = np.uint8(array)
     mat = mat.transpose(1,2,0)
     mat = cv2.cvtColor(mat, cv2.COLOR_BGR2RGB)
-    mat_list = None
     mat_list = []
     for i in range(2):
         mat_list.append(mat.copy())
