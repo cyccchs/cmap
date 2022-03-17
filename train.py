@@ -12,7 +12,6 @@ from torch.utils.tensorboard import SummaryWriter
 
 writer = SummaryWriter()
 gpu = True
-torch.autograd.set_detect_anomaly(True)
 class train:
     def __init__(self):
         #self.ds = HRSC2016('./HRSC2016/Train/AllImages/image_names.txt')
@@ -23,10 +22,10 @@ class train:
         else:
             self.device = torch.device('cpu')
         self.batch_size = 2
-        self.glimpse_num = 6
-        self.agent_num = 8
+        self.glimpse_num = 2
+        self.agent_num = 2
         self.epoch_num = 10000
-        self.glimpse_size = 100
+        self.glimpse_size = 400
         self.loader = DataLoader(
                     dataset=self.ds,
                     batch_size=self.batch_size,
@@ -47,6 +46,7 @@ class train:
                     loc_dim = 2, 
                     std = 0.22,
                     device = self.device)
+        print(self.model)
         self.model.to(self.device)
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.001)
 

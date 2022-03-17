@@ -104,8 +104,8 @@ class LocationNetwork(nn.Module):
         #l_t = torch.tensor([[0.75, -0.75],[0.75, -0.75],[0.75, -0.75]])
         #l_t = torch.tensor([[0.75, -0.75],[0.75, -0.75]])
         l_t = l_t.detach()
-        #log_pi = Normal(mu, self.std).log_prob(l_t)
-        log_pi = Normal(l_t, self.std).log_prob(l_t)
+        log_pi = Normal(mu, self.std).log_prob(l_t)
+        #log_pi = Normal(l_t, self.std).log_prob(l_t)
         log_pi = torch.sum(log_pi, dim=1)
         l_t = torch.clamp(l_t, -1, 1)
         #l_t = torch.tanh(l_t)
@@ -143,18 +143,18 @@ class CoreNetwork(nn.Module): #CCI(LSTM cell)
 
         h_t: 2D tensor of shape (B, hidden_size). Hidden state for current timestep.
     """
-    """
+    """ 
     def __init__(self, batch_size, lstm_size, device):
         super().__init__()
 
         self.lstm = nn.LSTMCell(lstm_size, lstm_size)
         self.h = torch.zeros(batch_size, lstm_size, dtype=torch.float32, requires_grad=True, device=device)
         self.c = torch.zeros(batch_size, lstm_size, dtype=torch.float32, requires_grad=True, device=device)
-    def forward(self, z_t):
+    def forward(self, z_t, h_t_prev):
          
-        self.h, self.c = self.lstm(z_t, (self.h,self.c))
+        h_t, self.c = self.lstm(z_t, (h_t_prev,self.c))
         
-        return self.h
+        return h_t
     """
     def __init__(self, input_size, hidden_size):
         super().__init__()
