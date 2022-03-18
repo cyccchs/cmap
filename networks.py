@@ -90,25 +90,22 @@ class LocationNetwork(nn.Module):
         super().__init__()
 
         self.std = std
-        self.fc = nn.Linear(input_size, output_size)
+        hidden_size = input_size // 2
+        self.fc = nn.Linear(input_size, hidden_size)
+        self.fc_lt = nn.Linear(hidden_size, output_size)
         self.to(device)
 
     def forward(self, s_t):
-        #feat = F.relu(self.fc(s_t.detach()))
-        mu = torch.tanh(self.fc(s_t))
-        #l_t  = self.fc(s_t)
-        #l_t = torch.clamp(l_t, -1, 1)
+        feat = F.relu(self.fc(s_t.detach()))
+        mu = torch.tanh(self.fc_lt(feat))
 
         l_t = Normal(mu, self.std).rsample()
-        #l_t = -2 * torch.rand(2,2) + 1
         #l_t = torch.tensor([[0.75, -0.75],[0.75, -0.75],[0.75, -0.75]])
         #l_t = torch.tensor([[0.75, -0.75],[0.75, -0.75]])
         l_t = l_t.detach()
         log_pi = Normal(mu, self.std).log_prob(l_t)
-        #log_pi = Normal(l_t, self.std).log_prob(l_t)
         log_pi = torch.sum(log_pi, dim=1)
         l_t = torch.clamp(l_t, -1, 1)
-        #l_t = torch.tanh(l_t)
 
         return log_pi, l_t
 

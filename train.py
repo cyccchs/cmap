@@ -41,14 +41,13 @@ class train:
                     glimpse_size = self.glimpse_size,
                     glimpse_num = self.glimpse_num,
                     c = 3, 
-                    lstm_size = 256, 
                     hidden_size = 256, 
                     loc_dim = 2, 
                     std = 0.22,
                     device = self.device)
-        print(self.model)
         self.model.to(self.device)
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.001)
+        #self.scheduler = ReduceLROnPlateau(self.optimizer, "min", patience=100)
 
 
     def weighted_reward(self, reward, alpha):

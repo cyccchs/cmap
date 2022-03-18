@@ -6,18 +6,17 @@ from agent import Agent
 debug = False
 
 class MultiAgentRecurrentAttention(nn.Module):
-    def __init__(self, batch_size, agent_num, h_g, h_l, glimpse_size, glimpse_num, c, lstm_size, hidden_size, loc_dim, std, device):
+    def __init__(self, batch_size, agent_num, h_g, h_l, glimpse_size, glimpse_num, c, hidden_size, loc_dim, std, device):
         super().__init__()
         self.agents = []
         self.agent_num = agent_num
         self.glimpse_num = glimpse_num
         self.batch_size = batch_size
-        self.lstm_size = lstm_size
         self.device = device
         self.selfatt = networks.SelfAttention(hidden_size)
         self.softatt = networks.SoftAttention(hidden_size, device)
         #self.lstm = networks.CoreNetwork(batch_size, lstm_size, device)
-        self.rnn = networks.CoreNetwork(256, 256)
+        self.rnn = networks.CoreNetwork(hidden_size, hidden_size)
         self.classifier = networks.ActionNetwork(hidden_size, 2)
         for i in range(self.agent_num):
             self.agents.append(Agent(h_g, h_l, glimpse_size, c, hidden_size, loc_dim, std, device))
@@ -25,8 +24,7 @@ class MultiAgentRecurrentAttention(nn.Module):
     def reset(self):
         init_l_list = []
         for i in range(self.agent_num):
-            #init_l = torch.FloatTensor(self.batch_size, 2).uniform_(-1.0,1.0).to(self.device)
-            init_l = (-2 * torch.rand(2, 2) + 1).to(self.device)
+            init_l = torch.FloatTensor(self.batch_size, 2).uniform_(-1.0,1.0).to(self.device)
             init_l.requires_grad = True
             init_l_list.append(init_l)
         init_h = torch.zeros(self.batch_size, 256, dtype=torch.float32, device=self.device, requires_grad=True) #lstm size
