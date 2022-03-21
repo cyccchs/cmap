@@ -41,8 +41,6 @@ class MultiAgentRecurrentAttention(nn.Module):
         s_t = self.selfatt(g_list)
         s_t = torch.unbind(s_t, dim=1) # s_t: agent_num*(batch_size, hidden_size)
         alpha, z_t = self.softatt(g_list, h_t)
-        #z_t = torch.rand(2,256)
-        #alpha = torch.rand(2,4)
         #h_t = self.lstm(z_t, h_t)
         h_t = self.rnn(z_t, h_t)
         #tempG = torch.cat(g_list, dim=1)

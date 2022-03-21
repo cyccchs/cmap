@@ -92,12 +92,13 @@ class LocationNetwork(nn.Module):
         self.std = std
         hidden_size = input_size // 2
         self.fc = nn.Linear(input_size, hidden_size)
-        self.fc_lt = nn.Linear(hidden_size, output_size)
+        self.fc_lt = nn.Linear(input_size, output_size)
         self.to(device)
 
     def forward(self, s_t):
-        feat = F.relu(self.fc(s_t.detach()))
-        mu = torch.tanh(self.fc_lt(feat))
+        #feat = F.relu(self.fc(s_t.detach()))
+        #mu = torch.tanh(self.fc_lt(s_t.detach()))
+        mu = torch.tanh(self.fc_lt(s_t))
 
         l_t = Normal(mu, self.std).rsample()
         #l_t = torch.tensor([[0.75, -0.75],[0.75, -0.75],[0.75, -0.75]])
@@ -124,7 +125,8 @@ class BaselineNetwork(nn.Module):
         self.to(device)
 
     def forward(self, s_t):
-        b = self.fc(s_t.detach())
+        #b = self.fc(s_t.detach())
+        b = self.fc(s_t)
         b = torch.squeeze(b)
         
         return b
@@ -176,6 +178,7 @@ class SelfAttention(nn.Module):
     
     def forward(self, g_list):
         G = torch.stack(g_list, dim=1)
+        G = G.detach()
         #G:[b, agent_num, hidden_size]
         x = self.w(G)
         q = self.wq(x)
@@ -198,12 +201,12 @@ class SoftAttention(nn.Module):
         self.device = device
     
     def forward(self, g_list, h_t):
-        G = torch.stack(g_list) # to represent 4 agents' g_t
-        y_list = [torch.tanh(self.wk(G[i]) + self.wq(h_t)) for i in range(len(G))]
-        m_list = [self.wg(y_list[i]) for i in range(len(G))]
-        m_concat = torch.cat([m_list[i] for i in range(len(G))], dim=1)
+        #G = torch.stack(g_list) # to represent 4 agents' g_t
+        y_list = [torch.tanh(self.wk(g_list[i]) + self.wq(h_t)) for i in range(len(g_list))]
+        m_list = [self.wg(y_list[i]) for i in range(len(g_list))]
+        m_concat = torch.cat([m_list[i] for i in range(len(g_list))], dim=1)
         alpha = F.softmax(m_concat, dim=-1)
-        z_list = [torch.mul(G[i], torch.index_select(alpha, 1, torch.tensor(i).to(self.device))) for i in range(len(G))]
+        z_list = [torch.mul(g_list[i], torch.index_select(alpha, 1, torch.tensor(i).to(self.device))) for i in range(len(g_list))]
         z_stack = torch.stack(z_list, 2)
         z_t = torch.sum(z_stack, 2) #similar to reduce_sum
 

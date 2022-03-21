@@ -1,4 +1,5 @@
 import os
+import time
 from dataloader import HRSC2016
 from tqdm import tqdm
 from torch.utils.data import DataLoader
@@ -25,13 +26,14 @@ class train:
         self.glimpse_num = 2
         self.agent_num = 2
         self.epoch_num = 10000
-        self.glimpse_size = 400
+        self.glimpse_size = 200
         self.loader = DataLoader(
                     dataset=self.ds,
                     batch_size=self.batch_size,
                     num_workers=1,
                     collate_fn=self.collater,
-                    shuffle=True)
+                    shuffle=True,
+                    drop_last=True)
 
         self.model = MultiAgentRecurrentAttention(
                     batch_size=self.batch_size,
@@ -43,10 +45,10 @@ class train:
                     c = 3, 
                     hidden_size = 256, 
                     loc_dim = 2, 
-                    std = 0.22,
+                    std = 0.2,
                     device = self.device)
         self.model.to(self.device)
-        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.001)
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.0001)
         #self.scheduler = ReduceLROnPlateau(self.optimizer, "min", patience=100)
 
 
@@ -62,7 +64,7 @@ class train:
 
     def train(self):
         for epoch in range(self.epoch_num):
-            avg_loss, avg_rl, avg_act, avg_base, avg_acc, avg_reward = self.one_epoch(epoch)
+            avg_loss, avg_rl, avg_act, avg_base, avg_acc, avg_reward = self.train_one_epoch(epoch)
             writer.add_scalar('avg acc', avg_acc, epoch)
             writer.add_scalar('avg rl loss', avg_rl, epoch)
             writer.add_scalar('avg action loss', avg_act, epoch)
@@ -72,13 +74,14 @@ class train:
             writer.flush()
 
 
-    def one_epoch(self, epoch):
+    def train_one_epoch(self, epoch):
 
         self.model.train()
         print('EPOCH:', epoch)
         iteration = 0
         acc_list, loss_list, reward_list = [], [], []
         loss_rl, loss_act, loss_base = [], [], []
+        start_t = time.time()
         with tqdm(enumerate(self.loader), total=len(self.loader)) as pbar:
             for j, (ni,batch) in enumerate(pbar):
                 imgs, existence = batch['image'], batch['existence']
@@ -98,18 +101,18 @@ class train:
                 draw(imgs, l_list, existence, predicted, reward, epoch, self.glimpse_size, self.agent_num)
                 
                 reward_list.append(torch.sum(reward)/len(reward))
-                reward = reward.unsqueeze(1).repeat(1,self.glimpse_num,1) 
+                reward = reward.unsqueeze(1).repeat(1,self.glimpse_num,1)
                 #reward[batch_size, time_step, agent_num]
                 advantage = reward - baselines.detach()
                 
                 loss_reinforce = torch.sum(-log_pi_all * advantage, dim=1)#sum along all glimpses
                 #loss_reinforce = torch.sum(-log_pi_all * 1, dim=1)#sum along all glimpses
                 
-                loss_reinforce = torch.mean(loss_reinforce, dim=0).sum()
+                loss_reinforce = torch.mean(loss_reinforce, dim=0).sum() #actor
                 #mean along all batch then sum up
-                loss_baseline = F.mse_loss(baselines, reward)
-                loss_action = F.nll_loss(log_probs, torch.tensor(existence))
-                loss_reinforce = loss_reinforce*0.01
+                loss_baseline = F.mse_loss(baselines, reward) #critic
+                loss_action = F.nll_loss(log_probs, torch.tensor(existence)) #classification
+                loss_reinforce = loss_reinforce*1
                 loss = loss_action + loss_reinforce + loss_baseline
                 #loss = loss_action + loss_reinforce*0.001
                 
@@ -131,6 +134,12 @@ class train:
                 #writer.add_scalar('accuracy', acc, iteration)
                 loss.backward()
                 self.optimizer.step()
+                end_t = time.time()
+                pbar.set_description(
+                        ("{:.1f}s - loss: {:.2f} - acc: {:.2f}".format(
+                            (end_t - start_t), loss.item(), avg_acc)
+                        )
+                )
                 iteration = iteration + 1
         return avg_loss, avg_rl, avg_act, avg_base, avg_acc, avg_reward
 writer.close()
