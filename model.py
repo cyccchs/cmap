@@ -6,20 +6,20 @@ from agent import Agent
 debug = False
 
 class MultiAgentRecurrentAttention(nn.Module):
-    def __init__(self, batch_size, agent_num, h_g, h_l, glimpse_size, glimpse_num, c, hidden_size, loc_dim, std, device):
+    def __init__(self, ckpt_dir, batch_size, agent_num, h_g, h_l, glimpse_size, glimpse_num, c, hidden_size, loc_dim, std, device):
         super().__init__()
         self.agents = []
+        self.ckpt_dir = ckpt_dir
         self.agent_num = agent_num
         self.glimpse_num = glimpse_num
         self.batch_size = batch_size
         self.device = device
         self.selfatt = networks.SelfAttention(hidden_size)
         self.softatt = networks.SoftAttention(hidden_size, device)
-        #self.lstm = networks.CoreNetwork(batch_size, lstm_size, device)
         self.rnn = networks.CoreNetwork(hidden_size, hidden_size)
         self.classifier = networks.ActionNetwork(hidden_size, 2)
         for i in range(self.agent_num):
-            self.agents.append(Agent(h_g, h_l, glimpse_size, c, hidden_size, loc_dim, std, device))
+            self.agents.append(Agent(i, ckpt_dir, h_g, h_l, glimpse_size, c, hidden_size, loc_dim, std, device))
     
     def reset(self):
         init_l_list = []
@@ -81,4 +81,15 @@ class MultiAgentRecurrentAttention(nn.Module):
         log_pi_list.append(log_pi_t)
 
         return l_list, b_list, log_pi_list, log_probas, alpha
+
+    def save_agent_ckpt(self):
+        print("saving checkpoint in %s" % self.ckpt_dir)
+        for agent in self.agents:
+            agent.save_model()
+
+    def load_agent_ckpt(self):
+        print("loading checkpoint in %s" % self.ckpt_dir)
+        for agent in self.agents:
+            agent.load_model()
+
 

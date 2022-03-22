@@ -1,4 +1,5 @@
 import os
+import shutil
 import time
 from dataloader import HRSC2016
 from tqdm import tqdm
@@ -22,11 +23,20 @@ class train:
             self.device = torch.device('cuda')
         else:
             self.device = torch.device('cpu')
+        self.resume = False
+        self.start_epoch = 0
         self.batch_size = 2
         self.glimpse_num = 2
         self.agent_num = 2
         self.epoch_num = 10000
         self.glimpse_size = 200
+        self.ckpt_dir = "./ckpt"
+        self.model_name = "{}agents_{}g_{}x{}".format(
+                self.agent_num,
+                self.glimpse_num,
+                self.glimpse_size,
+                self.glimpse_size
+                )
         self.loader = DataLoader(
                     dataset=self.ds,
                     batch_size=self.batch_size,
@@ -36,6 +46,7 @@ class train:
                     drop_last=True)
 
         self.model = MultiAgentRecurrentAttention(
+                    ckpt_dir = self.ckpt_dir,
                     batch_size=self.batch_size,
                     agent_num = self.agent_num,
                     h_g = 128,
@@ -63,7 +74,9 @@ class train:
         return torch.stack(reward_list, dim=0)
 
     def train(self):
-        for epoch in range(self.epoch_num):
+        if self.resume:
+            self.load_ckpt()
+        for epoch in range(self.start_epoch, self.epoch_num):
             avg_loss, avg_rl, avg_act, avg_base, avg_acc, avg_reward = self.train_one_epoch(epoch)
             writer.add_scalar('avg acc', avg_acc, epoch)
             writer.add_scalar('avg rl loss', avg_rl, epoch)
@@ -72,6 +85,12 @@ class train:
             writer.add_scalar('avg loss', avg_loss, epoch)
             writer.add_scalar('avg_reward', avg_reward, epoch)
             writer.flush()
+            self.save_ckpt(
+                    {
+                        "epoch": epoch +1,
+                        "model_state": self.model.state_dict(),
+                        "optim_state": self.optimizer.state_dict(),
+                    })
 
 
     def train_one_epoch(self, epoch):
@@ -142,8 +161,33 @@ class train:
                 )
                 iteration = iteration + 1
         return avg_loss, avg_rl, avg_act, avg_base, avg_acc, avg_reward
-writer.close()
+    
+    def save_ckpt(self, state, is_best=False):
+        filename = self.model_name + ".pth.tar"
+        ckpt_path = os.path.join(self.ckpt_dir, filename)
+        torch.save(state, ckpt_path)
+        self.model.save_agent_ckpt()
+        if is_best:
+            filename = self.model_name + "_model_best.pth.tar"
+            shutil.copyfile(ckpt_path, os.path.join(self.ckpt_dir, filename))
 
+    def load_ckpt(self, best=False):
+        print("[*] Loading model from {}".format(self.ckpt_dir))
+        filename = self.model_name + ".pth.tar"
+        if best:
+            filename = self.model_name + "_model_best.pth.tar"
+        ckpt_path = os.path.join(self.ckpt_dir, filename)
+        ckpt = torch.load(ckpt_path)
+        self.start_epoch = ckpt["epoch"]
+        self.model.load_state_dict(ckpt["model_state"])
+        self.optimizer.load_state_dict(ckpt["optim_state"])
+        self.model.load_agent_ckpt()
+
+        print("[*] Loaded {} checkpoint @ epoch {}".format(filename, ckpt["epoch"]))
+
+
+writer.close()
+    
 if __name__ == '__main__':
     trainer = train()
     trainer.train()

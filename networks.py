@@ -1,3 +1,4 @@
+import os
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -46,10 +47,10 @@ class GlimpseNetwork(nn.Module):
         l_pre: location(l) of previous time step
     """
     
-    def __init__(self, h_g, h_l, glimpse_size, c, device):
+    def __init__(self, name, ckpt_dir,  h_g, h_l, glimpse_size, c, device):
         super().__init__()
+        self.ckpt_path = os.path.join(ckpt_dir, name)
         self.retina = Retina(glimpse_size)
-
         dimension = glimpse_size * glimpse_size * c
         self.fc1 = nn.Linear(dimension, h_g)
 
@@ -74,6 +75,11 @@ class GlimpseNetwork(nn.Module):
         
         return g_t
 
+    def save_ckpt(self):
+        torch.save(self.state_dict(), self.ckpt_path)
+    def load_ckpt(self):
+        self.load_state_dict(torch.load(self.ckpt_path))
+
 class LocationNetwork(nn.Module):
     """
         input_size: input size of the fc layer
@@ -86,8 +92,9 @@ class LocationNetwork(nn.Module):
         l_t: 2D vector of shape(B,2)
     """
     
-    def __init__(self, input_size, output_size, std, device):
+    def __init__(self, name, ckpt_dir, input_size, output_size, std, device):
         super().__init__()
+        self.ckpt_path = os.path.join(ckpt_dir, name)
 
         self.std = std
         hidden_size = input_size // 2
@@ -109,6 +116,11 @@ class LocationNetwork(nn.Module):
         l_t = torch.clamp(l_t, -1, 1)
 
         return log_pi, l_t
+    
+    def save_ckpt(self):
+        torch.save(self.state_dict(), self.ckpt_path)
+    def load_ckpt(self):
+        self.load_state_dict(torch.load(self.ckpt_path))
 
 class BaselineNetwork(nn.Module):
     """
@@ -118,8 +130,9 @@ class BaselineNetwork(nn.Module):
 
         b_t: 2D vector of shape (B, 1). The baseline for the current time step 't'
     """
-    def __init__(self, input_size, output_size, device):
+    def __init__(self, name, ckpt_dir, input_size, output_size, device):
         super().__init__()
+        self.ckpt_path = os.path.join(ckpt_dir, name)
 
         self.fc = nn.Linear(input_size, output_size)
         self.to(device)
@@ -130,6 +143,11 @@ class BaselineNetwork(nn.Module):
         b = torch.squeeze(b)
         
         return b
+    
+    def save_ckpt(self):
+        torch.save(self.state_dict(), self.ckpt_path)
+    def load_ckpt(self):
+        self.load_state_dict(torch.load(self.ckpt_path))
 
 class CoreNetwork(nn.Module): #CCI(LSTM cell)
     """
