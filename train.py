@@ -14,10 +14,11 @@ from torch.utils.tensorboard import SummaryWriter
 
 writer = SummaryWriter()
 gpu = True
-class train:
+class Trainer:
     def __init__(self):
-        #self.ds = HRSC2016('./HRSC2016/Train/AllImages/image_names.txt')
-        self.ds = HRSC2016('./HRSC2016/grayscale_test/AllImages/image_names.txt')
+        self.train_ds = HRSC2016('./HRSC2016/test/AllImages/image_names.txt')
+        self.val_ds = HRSC2016('./HRSC2016/val/AllImages/image_names.txt')
+        #self.ds = HRSC2016('./HRSC2016/grayscale_test/AllImages/image_names.txt')
         self.collater = Collater(scales=800)
         if gpu and torch.cuda.is_available():
             self.device = torch.device('cuda')
@@ -25,7 +26,7 @@ class train:
             self.device = torch.device('cpu')
         self.resume = False
         self.start_epoch = 0
-        self.batch_size = 2
+        self.batch_size = 16
         self.glimpse_num = 2
         self.agent_num = 2
         self.epoch_num = 10000
@@ -37,8 +38,15 @@ class train:
                 self.glimpse_size,
                 self.glimpse_size
                 )
-        self.loader = DataLoader(
-                    dataset=self.ds,
+        self.train_loader = DataLoader(
+                    dataset=self.train_ds,
+                    batch_size=self.batch_size,
+                    num_workers=1,
+                    collate_fn=self.collater,
+                    shuffle=True,
+                    drop_last=True)
+        self.val_loader = DataLoader(
+                    dataset=self.val_ds,
                     batch_size=self.batch_size,
                     num_workers=1,
                     collate_fn=self.collater,
@@ -77,13 +85,13 @@ class train:
         if self.resume:
             self.load_ckpt()
         for epoch in range(self.start_epoch, self.epoch_num):
-            avg_loss, avg_rl, avg_act, avg_base, avg_acc, avg_reward = self.train_one_epoch(epoch)
-            writer.add_scalar('avg acc', avg_acc, epoch)
-            writer.add_scalar('avg rl loss', avg_rl, epoch)
-            writer.add_scalar('avg action loss', avg_act, epoch)
-            writer.add_scalar('avg basline loss', avg_base, epoch)
-            writer.add_scalar('avg loss', avg_loss, epoch)
-            writer.add_scalar('avg_reward', avg_reward, epoch)
+            train_loss, train_rl, train_act, train_base, train_acc = self.train_one_epoch(epoch)
+            val_loss, val_rl, val_act, val_base, val_acc = self.validate(epoch)
+            writer.add_scalar('val acc', val_acc, epoch)
+            writer.add_scalar('val rl loss', val_rl, epoch)
+            writer.add_scalar('val action loss', val_act, epoch)
+            writer.add_scalar('val basline loss', val_base, epoch)
+            writer.add_scalar('val loss', val_loss, epoch)
             writer.flush()
             self.save_ckpt(
                     {
@@ -94,14 +102,13 @@ class train:
 
 
     def train_one_epoch(self, epoch):
-
         self.model.train()
         print('EPOCH:', epoch)
         iteration = 0
         acc_list, loss_list, reward_list = [], [], []
         loss_rl, loss_act, loss_base = [], [], []
         start_t = time.time()
-        with tqdm(enumerate(self.loader), total=len(self.loader)) as pbar:
+        with tqdm(enumerate(self.train_loader), total=len(self.train_loader)) as pbar:
             for j, (ni,batch) in enumerate(pbar):
                 imgs, existence = batch['image'], batch['existence']
                 imgs = imgs.to(self.device)
@@ -117,7 +124,7 @@ class train:
                 reward = (predicted.detach() == torch.tensor(existence).detach()).float()
                 reward = self.weighted_reward(reward, alpha).to(self.device)
                 
-                draw(imgs, l_list, existence, predicted, reward, epoch, self.glimpse_size, self.agent_num)
+                #draw(imgs, l_list, existence, predicted, reward, epoch, self.glimpse_size, self.agent_num)
                 
                 reward_list.append(torch.sum(reward)/len(reward))
                 reward = reward.unsqueeze(1).repeat(1,self.glimpse_num,1)
@@ -160,7 +167,64 @@ class train:
                         )
                 )
                 iteration = iteration + 1
-        return avg_loss, avg_rl, avg_act, avg_base, avg_acc, avg_reward
+        return avg_loss, avg_rl, avg_act, avg_base, avg_acc
+    @torch.no_grad()
+    def validate(self, epoch):
+        iteration = 0
+        acc_list, loss_list, reward_list = [], [], []
+        loss_rl, loss_act, loss_base = [], [], []
+        for i, batch in enumerate(self.val_loader):
+            imgs, existence = batch['image'], batch['existence']
+            imgs = imgs.to(self.device)
+            existence = torch.tensor(existence).detach()
+            existence = existence.to(self.device)
+            self.optimizer.zero_grad()
+            
+            l_list, b_list, log_pi_list, log_probs, alpha = self.model(imgs)
+
+            log_pi_all = torch.stack(log_pi_list, dim=1) #[batch_size, time_step, agent_num]
+            baselines = torch.stack(b_list, dim=1) #[batch_size, time_step, agent_num]
+            predicted = torch.max(log_probs, 1)[1]  #indices store in element[1]
+            reward = (predicted.detach() == torch.tensor(existence).detach()).float()
+            reward = self.weighted_reward(reward, alpha).to(self.device)
+            
+            draw(imgs, l_list, existence, predicted, reward, epoch, self.glimpse_size, self.agent_num)
+            
+            reward_list.append(torch.sum(reward)/len(reward))
+            reward = reward.unsqueeze(1).repeat(1,self.glimpse_num,1)
+            #reward[batch_size, time_step, agent_num]
+            advantage = reward - baselines.detach()
+            
+            loss_reinforce = torch.sum(-log_pi_all * advantage, dim=1)#sum along all glimpses
+            #loss_reinforce = torch.sum(-log_pi_all * 1, dim=1)#sum along all glimpses
+            
+            loss_reinforce = torch.mean(loss_reinforce, dim=0).sum() #actor
+            #mean along all batch then sum up
+            loss_baseline = F.mse_loss(baselines, reward) #critic
+            loss_action = F.nll_loss(log_probs, torch.tensor(existence)) #classification
+            loss_reinforce = loss_reinforce*1
+            loss = loss_action + loss_reinforce + loss_baseline
+            #loss = loss_action + loss_reinforce*0.001
+            
+            correct = (predicted.detach()==torch.tensor(existence).detach()).float()
+            acc = 100*(correct.sum()/len(existence))
+            acc_list.append(acc)
+            loss_list.append(loss)
+            loss_rl.append(loss_reinforce)
+            loss_act.append(loss_action)
+            loss_base.append(loss_baseline)
+            avg_loss = sum(loss_list)/len(loss_list)
+            avg_rl = sum(loss_rl)/len(loss_rl)
+            avg_act = sum(loss_act)/len(loss_act)
+            avg_base = sum(loss_base)/len(loss_base)
+            avg_acc = sum(acc_list)/len(acc_list)
+            avg_reward = sum(reward_list)/len(reward_list)
+
+            iteration = iteration + 1
+        return avg_loss, avg_rl, avg_act, avg_base, avg_acc
+    
+    def test(self):
+        pass
     
     def save_ckpt(self, state, is_best=False):
         filename = self.model_name + ".pth.tar"
@@ -189,7 +253,7 @@ class train:
 writer.close()
     
 if __name__ == '__main__':
-    trainer = train()
+    trainer = Trainer()
     trainer.train()
 
 
