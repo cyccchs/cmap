@@ -20,15 +20,15 @@ class Agent:
     def baseline(self, s_t):
         return self.baseline(s_t)
     
-    def save_model(self):
-        self.retina.save_ckpt()
-        self.location.save_ckpt()
-        self.baseline.save_ckpt()
+    def save_model(self, is_best):
+        self.retina.save_ckpt(is_best)
+        self.location.save_ckpt(is_best)
+        self.baseline.save_ckpt(is_best)
     
-    def load_model(self):
-        self.retina.load_ckpt()
-        self.location.load_ckpt()
-        self.baseline.load_ckpt()
+    def load_model(self, is_best):
+        self.retina.load_ckpt(is_best)
+        self.location.load_ckpt(is_best)
+        self.baseline.load_ckpt(is_best)
 
 
         

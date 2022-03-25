@@ -50,6 +50,7 @@ class GlimpseNetwork(nn.Module):
     def __init__(self, name, ckpt_dir,  h_g, h_l, glimpse_size, c, device):
         super().__init__()
         self.ckpt_path = os.path.join(ckpt_dir, name)
+        self.best_ckpt_path = os.path.join(ckpt_dir, "best_" + name)
         self.retina = Retina(glimpse_size)
         dimension = glimpse_size * glimpse_size * c
         self.fc1 = nn.Linear(dimension, h_g)
@@ -75,10 +76,16 @@ class GlimpseNetwork(nn.Module):
         
         return g_t
 
-    def save_ckpt(self):
-        torch.save(self.state_dict(), self.ckpt_path)
-    def load_ckpt(self):
-        self.load_state_dict(torch.load(self.ckpt_path))
+    def save_ckpt(self, is_best):
+        if is_best:
+            torch.save(self.state_dict(), self.best_ckpt_path)
+        else:
+            torch.save(self.state_dict(), self.ckpt_path)
+    def load_ckpt(self, is_best):
+        if is_best:
+            self.load_state_dict(torch.load(self.best_ckpt_path))
+        else:
+            self.load_state_dict(torch.load(self.ckpt_path))
 
 class LocationNetwork(nn.Module):
     """
@@ -95,6 +102,7 @@ class LocationNetwork(nn.Module):
     def __init__(self, name, ckpt_dir, input_size, output_size, std, device):
         super().__init__()
         self.ckpt_path = os.path.join(ckpt_dir, name)
+        self.best_ckpt_path = os.path.join(ckpt_dir, "best_" + name)
 
         self.std = std
         hidden_size = input_size // 2
@@ -117,10 +125,16 @@ class LocationNetwork(nn.Module):
 
         return log_pi, l_t
     
-    def save_ckpt(self):
-        torch.save(self.state_dict(), self.ckpt_path)
-    def load_ckpt(self):
-        self.load_state_dict(torch.load(self.ckpt_path))
+    def save_ckpt(self, is_best):
+        if is_best:
+            torch.save(self.state_dict(), self.best_ckpt_path)
+        else:
+            torch.save(self.state_dict(), self.ckpt_path)
+    def load_ckpt(self, is_best):
+        if is_best:
+            self.load_state_dict(torch.load(self.best_ckpt_path))
+        else:
+            self.load_state_dict(torch.load(self.ckpt_path))
 
 class BaselineNetwork(nn.Module):
     """
@@ -133,6 +147,7 @@ class BaselineNetwork(nn.Module):
     def __init__(self, name, ckpt_dir, input_size, output_size, device):
         super().__init__()
         self.ckpt_path = os.path.join(ckpt_dir, name)
+        self.best_ckpt_path = os.path.join(ckpt_dir, "best_" + name)
 
         self.fc = nn.Linear(input_size, output_size)
         self.to(device)
@@ -144,10 +159,16 @@ class BaselineNetwork(nn.Module):
         
         return b
     
-    def save_ckpt(self):
-        torch.save(self.state_dict(), self.ckpt_path)
-    def load_ckpt(self):
-        self.load_state_dict(torch.load(self.ckpt_path))
+    def save_ckpt(self, is_best):
+        if is_best:
+            torch.save(self.state_dict(), self.best_ckpt_path)
+        else:
+            torch.save(self.state_dict(), self.ckpt_path)
+    def load_ckpt(self, is_best):
+        if is_best:
+            self.load_state_dict(torch.load(self.best_ckpt_path))
+        else:
+            self.load_state_dict(torch.load(self.ckpt_path))
 
 class CoreNetwork(nn.Module): #CCI(LSTM cell)
     """

@@ -78,23 +78,21 @@ def denormalize(input_tensor):
                                                     (1.,1.,1.))])
     return inverse(input_tensor)
 
-def draw_bbox(img, x, y, size, exist, pred, reward, i):
+def draw_bbox(img, x, y, size, exist, pred, i):
     font = cv2.FONT_HERSHEY_SIMPLEX
     img = cv2.putText(img, 'class'+str(exist[0]), (20,20), font, 0.8, (0,0,255), 2)
     img = cv2.putText(img, 'pred: '+str(pred[0].item()), (20,40), font, 0.8, (0,0,255), 2)
-    img = cv2.putText(img, 'reward: '+str(reward[0][0].item()), (20,60), font, 0.8, (0,0,255), 2)
     if i == 0:
         return cv2.rectangle(img, (round(x-size/2),round(y-size/2)), (round(x+size/2), round(y+size/2)), (255,0,0), 2)
     if i == 1:
         return cv2.rectangle(img, (round(x-size/2),round(y-size/2)), (round(x+size/2), round(y+size/2)), (0,255,0), 2)
 
-def draw(imgs, l_list, existence, predicted, reward, epoch, size, agent_num):
+def draw(imgs, l_list, existence, predicted, epoch, size, agent_num):
     #imgs: [batch_size,channel,width,height]
     #l_list: [glimpse_size, agent_num, [batch_size, location]]
     imgs = imgs.cpu()
     existence = existence.cpu().numpy()
     predicted = predicted.cpu().detach()
-    reward = reward.cpu()
 
     array = denormalize(imgs[0]).numpy()
     maxval = array.max()
@@ -108,11 +106,11 @@ def draw(imgs, l_list, existence, predicted, reward, epoch, size, agent_num):
     for j in range(agent_num):
         x = round((l_list[0][j][0][0].item() + 1) * 400)
         y = round((l_list[0][j][0][1].item() + 1) * 400)
-        draw_bbox(mat_list[0], x, y, size, existence, predicted, reward, 0)
+        draw_bbox(mat_list[0], x, y, size, existence, predicted, 0)
     for j in range(agent_num):
         x = round((l_list[len(l_list)-1][j][0][0].item() + 1) * 400)
         y = round((l_list[len(l_list)-1][j][0][1].item() + 1) * 400)
-        draw_bbox(mat_list[1], x, y, size, existence, predicted, reward, 1)
+        draw_bbox(mat_list[1], x, y, size, existence, predicted, 1)
 
     output = mat_list[0]
     for i in range(len(mat_list)-1):

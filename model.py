@@ -82,14 +82,14 @@ class MultiAgentRecurrentAttention(nn.Module):
 
         return l_list, b_list, log_pi_list, log_probas, alpha
 
-    def save_agent_ckpt(self):
-        print("saving checkpoint in %s" % self.ckpt_dir)
+    def save_agent_ckpt(self, is_best=False):
+        print("--------agents saving checkpoint in %s" % self.ckpt_dir)
         for agent in self.agents:
-            agent.save_model()
+            agent.save_model(is_best)
 
-    def load_agent_ckpt(self):
-        print("loading checkpoint in %s" % self.ckpt_dir)
+    def load_agent_ckpt(self, is_best=False):
+        print("--------agents loading checkpoint in %s" % self.ckpt_dir)
         for agent in self.agents:
-            agent.load_model()
+            agent.load_model(is_best)
 
 
