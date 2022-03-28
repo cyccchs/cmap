@@ -26,7 +26,7 @@ class Trainer:
             self.device = torch.device('cuda')
         else:
             self.device = torch.device('cpu')
-        self.draw_per_n_epoch = 1
+        self.draw_per_n_epoch = 50
         self.save_ckpt_per_n_epoch = 50
         self.resume = False
         self.best_val_acc = 0.0
