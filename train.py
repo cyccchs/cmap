@@ -17,7 +17,7 @@ gpu = True
 is_train = True
 class Trainer:
     def __init__(self):
-        self.train_ds = HRSC2016('../HRSC2016/Train/AllImages/image_names.txt')
+        self.train_ds = HRSC2016('../HRSC2016/train/AllImages/image_names.txt')
         self.val_ds = HRSC2016('../HRSC2016/val/AllImages/image_names.txt')
         self.test_ds = HRSC2016('../HRSC2016/test/AllImages/image_names.txt')
         #self.ds = HRSC2016('./HRSC2016/grayscale_test/AllImages/image_names.txt')
