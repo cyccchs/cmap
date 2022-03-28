@@ -79,15 +79,6 @@ def denormalize(input_tensor):
                                                     (1.,1.,1.))])
     return inverse(input_tensor)
 
-def draw_bbox(img, x, y, size, exist, pred, i):
-    font = cv2.FONT_HERSHEY_SIMPLEX
-    img = cv2.putText(img, 'class'+str(exist[0]), (20,20), font, 0.8, (0,0,255), 2)
-    img = cv2.putText(img, 'pred: '+str(pred[0].item()), (20,40), font, 0.8, (0,0,255), 2)
-    if i == 0:
-        return cv2.rectangle(img, (round(x-size/2),round(y-size/2)), (round(x+size/2), round(y+size/2)), (255,0,0), 2)
-    if i == 1:
-        return cv2.rectangle(img, (round(x-size/2),round(y-size/2)), (round(x+size/2), round(y+size/2)), (0,255,0), 2)
-
 def draw_text(src, exist, pred):
     font = cv2.FONT_HERSHEY_SIMPLEX
     text1 = 'class' + str(exist)
@@ -110,7 +101,7 @@ def draw(imgs, l_list, exist, pred, batch_size, agent_num, g_size, g_num, epoch,
     imgs = imgs.cpu()
     exist = exist.cpu().numpy()
     pred = pred.cpu().detach().numpy()
-    save_path = os.path.join('./result', name, str(epoch))
+    save_path = os.path.join('./results', name, str(epoch))
     if batch == 0:
         os.makedirs(save_path)
 
