@@ -17,9 +17,9 @@ gpu = True
 is_train = True
 class Trainer:
     def __init__(self):
-        self.train_ds = HRSC2016('./HRSC2016/Train/AllImages/image_names.txt')
-        self.val_ds = HRSC2016('./HRSC2016/val/AllImages/image_names.txt')
-        self.test_ds = HRSC2016('./HRSC2016/test/AllImages/image_names.txt')
+        self.train_ds = HRSC2016('../HRSC2016/Train/AllImages/image_names.txt')
+        self.val_ds = HRSC2016('../HRSC2016/val/AllImages/image_names.txt')
+        self.test_ds = HRSC2016('../HRSC2016/test/AllImages/image_names.txt')
         #self.ds = HRSC2016('./HRSC2016/grayscale_test/AllImages/image_names.txt')
         self.collater = Collater(scales=800)
         if gpu and torch.cuda.is_available():
@@ -33,7 +33,7 @@ class Trainer:
         self.test_num = 25
         self.start_epoch = 0
         self.batch_size = 4
-        self.glimpse_num = 5
+        self.glimpse_num = 2
         self.agent_num = 4
         self.epoch_num = 50000
         self.glimpse_size = 200
@@ -101,6 +101,11 @@ class Trainer:
             train_loss, train_rl, train_act, train_base, train_acc = self.train_one_epoch(epoch)
             val_loss, val_rl, val_act, val_base, val_acc = self.validate(epoch)
             is_best = val_acc > self.best_val_acc
+            writer.add_scalar('train acc', train_acc, epoch)
+            writer.add_scalar('train rl loss', train_rl, epoch)
+            writer.add_scalar('train action loss', train_act, epoch)
+            writer.add_scalar('train basline loss', train_base, epoch)
+            writer.add_scalar('train loss', train_loss, epoch)
             writer.add_scalar('val acc', val_acc, epoch)
             writer.add_scalar('val rl loss', val_rl, epoch)
             writer.add_scalar('val action loss', val_act, epoch)

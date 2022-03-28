@@ -87,7 +87,7 @@ class HRSC2016(Dataset):
                 for obj in objects:
                     cls_id = obj[obj.find('<Class_ID>')+10 : obj.find('</Class_ID>')]
                     assert len(obj) != 0, 'No object found in %s' %xmlName
-                    if cls_id[7:9] in self.carrier_dict:
+                    if cls_id[7:9] in self.carrier_dict or cls_id[7:9] in self.warship_dict :
                         return 1
                 return 0
             else:
