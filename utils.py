@@ -1,3 +1,4 @@
+import os
 import cv2
 import torch
 import numpy as np
@@ -87,35 +88,56 @@ def draw_bbox(img, x, y, size, exist, pred, i):
     if i == 1:
         return cv2.rectangle(img, (round(x-size/2),round(y-size/2)), (round(x+size/2), round(y+size/2)), (0,255,0), 2)
 
-def draw(imgs, l_list, existence, predicted, epoch, size, agent_num):
-    #imgs: [batch_size,channel,width,height]
-    #l_list: [glimpse_size, agent_num, [batch_size, location]]
-    imgs = imgs.cpu()
-    existence = existence.cpu().numpy()
-    predicted = predicted.cpu().detach()
+def draw_text(src, exist, pred):
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    text1 = 'class' + str(exist)
+    text2 = 'pred:' + str(pred)
+    cv2.putText(src, text1, (20,20), font, 0.8, (0,0,255), 2)
+    cv2.putText(src, text2, (20,45), font, 0.8, (0,0,255), 2)
 
-    array = denormalize(imgs[0]).numpy()
-    maxval = array.max()
-    array = array*255/maxval
-    mat = np.uint8(array)
-    mat = mat.transpose(1,2,0)
-    mat = cv2.cvtColor(mat, cv2.COLOR_BGR2RGB)
-    mat_list = []
-    for i in range(2):
-        mat_list.append(mat.copy())
-    for j in range(agent_num):
-        x = round((l_list[0][j][0][0].item() + 1) * 400)
-        y = round((l_list[0][j][0][1].item() + 1) * 400)
-        draw_bbox(mat_list[0], x, y, size, existence, predicted, 0)
-    for j in range(agent_num):
-        x = round((l_list[len(l_list)-1][j][0][0].item() + 1) * 400)
-        y = round((l_list[len(l_list)-1][j][0][1].item() + 1) * 400)
-        draw_bbox(mat_list[1], x, y, size, existence, predicted, 1)
-
-    output = mat_list[0]
-    for i in range(len(mat_list)-1):
-        output = np.hstack((output, mat_list[i+1]))
+def draw_glimpse(src, x, y, size):
+    start_x = round(x-size/2)
+    start_y = round(y-size/2)
+    end_x = round(x+size/2)
+    end_y = round(y+size/2)
+    cv2.rectangle(src, (start_x, start_y), (end_x, end_y), (0,0,255), 2)  
     
-    cv2.imshow('img', output)
-    cv2.waitKey(1)
-    cv2.imwrite('./results/'+str(epoch)+'.jpg', output)
+    
+
+def draw(imgs, l_list, exist, pred, batch_size, agent_num, g_size, g_num, epoch, name, batch=0):
+    #imgs: [batch_size,channel,width,height]
+    #l_list: [glimpse_num, agent_num, [batch_size, location]]
+    imgs = imgs.cpu()
+    exist = exist.cpu().numpy()
+    pred = pred.cpu().detach().numpy()
+    save_path = os.path.join('./result', name, str(epoch))
+    if batch == 0:
+        os.makedirs(save_path)
+
+    for i in range(len(imgs)):
+        array = denormalize(imgs[i]).numpy()
+        maxval = array.max()
+        array = array*255/maxval
+        src = np.uint8(array)
+        src = src.transpose(1,2,0)
+        src = cv2.cvtColor(src, cv2.COLOR_BGR2RGB)
+        mat_list = []
+        for j in range(g_num):
+            mat = src.copy()
+            for k in range(agent_num):
+                x = round((l_list[j][k][i][0].item() + 1) * 800 / 2)
+                y = round((l_list[j][k][i][1].item() + 1) * 800 / 2)
+                draw_glimpse(mat, x, y, g_size)
+            mat_list.append(mat)
+        output = mat_list[0]
+        for j in range(len(mat_list)-1):
+            output = np.hstack((output,mat_list[j+1]))
+        output = cv2.resize(output, (1920, round(1920/g_num)))
+        draw_text(output, exist[i], pred[i])
+        #cv2.imshow('result', output)
+        #cv2.waitKey(1)
+        if batch == 0:
+            cv2.imwrite(save_path + '/' + str(i) + '.jpg', output)
+        else:
+            cv2.imwrite(save_path + '/' + str(batch) + str(i) + '.jpg', output)
+                

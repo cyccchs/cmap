@@ -9,9 +9,13 @@ from bbox import mask_valid_boxes, constraint_theta
 
 
 class HRSC2016(Dataset):
-    
+
     def __init__(self, name_path, level=1, binary=True):
         self.image_names_path = name_path
+        self.civilian_dict = {'01','04','18','20','22','24','25','26','29','30'}
+        self.warship_dict = {'03','07','08','09','10','11','15','19','28'}
+        self.carrier_dict = {'02','05','06','13','16','32'}
+        self.submarine_dict = {'27'}
         self.image_list = self._load_image_names()
         self.binary = binary
         self.level = level
@@ -83,7 +87,7 @@ class HRSC2016(Dataset):
                 for obj in objects:
                     cls_id = obj[obj.find('<Class_ID>')+10 : obj.find('</Class_ID>')]
                     assert len(obj) != 0, 'No object found in %s' %xmlName
-                    if cls_id == '100000001' or cls_id == '100000007':
+                    if cls_id[7:9] in self.carrier_dict:
                         return 1
                 return 0
             else:

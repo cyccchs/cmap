@@ -14,10 +14,10 @@ from torch.utils.tensorboard import SummaryWriter
 
 writer = SummaryWriter()
 gpu = True
-is_train = False
+is_train = True
 class Trainer:
     def __init__(self):
-        self.train_ds = HRSC2016('./HRSC2016/test/AllImages/image_names.txt')
+        self.train_ds = HRSC2016('./HRSC2016/Train/AllImages/image_names.txt')
         self.val_ds = HRSC2016('./HRSC2016/val/AllImages/image_names.txt')
         self.test_ds = HRSC2016('./HRSC2016/test/AllImages/image_names.txt')
         #self.ds = HRSC2016('./HRSC2016/grayscale_test/AllImages/image_names.txt')
@@ -26,14 +26,16 @@ class Trainer:
             self.device = torch.device('cuda')
         else:
             self.device = torch.device('cpu')
-        self.resume = True
+        self.draw_per_n_epoch = 1
+        self.save_ckpt_per_n_epoch = 50
+        self.resume = False
         self.best_val_acc = 0.0
         self.test_num = 25
         self.start_epoch = 0
-        self.batch_size = 16
-        self.glimpse_num = 2
-        self.agent_num = 2
-        self.epoch_num = 10000
+        self.batch_size = 4
+        self.glimpse_num = 5
+        self.agent_num = 4
+        self.epoch_num = 50000
         self.glimpse_size = 200
         self.ckpt_dir = "./ckpt"
         self.model_name = "{}agents_{}g_{}x{}".format(
@@ -54,7 +56,7 @@ class Trainer:
                     batch_size=self.batch_size,
                     num_workers=1,
                     collate_fn=self.collater,
-                    shuffle=True,
+                    shuffle=False,
                     drop_last=True)
         self.test_loader = DataLoader(
                     dataset=self.test_ds,
@@ -105,12 +107,13 @@ class Trainer:
             writer.add_scalar('val basline loss', val_base, epoch)
             writer.add_scalar('val loss', val_loss, epoch)
             writer.flush()
-            self.save_ckpt(
-                    {
-                        "epoch": epoch +1,
-                        "model_state": self.model.state_dict(),
-                        "optim_state": self.optimizer.state_dict(),
-                    }, is_best)
+            if epoch % self.save_ckpt_per_n_epoch == 0:
+                self.save_ckpt(
+						{
+							"epoch": epoch +1,
+							"model_state": self.model.state_dict(),
+							"optim_state": self.optimizer.state_dict(),
+						}, is_best)
 
 
     def train_one_epoch(self, epoch):
@@ -135,8 +138,8 @@ class Trainer:
                 predicted = torch.max(log_probs, 1)[1]  #indices store in element[1]
                 reward = (predicted.detach() == existence).float()
                 reward = self.weighted_reward(reward, alpha).to(self.device)
-                
-                #draw(imgs, l_list, existence, predicted, epoch, self.glimpse_size, self.agent_num)
+                if epoch % self.draw_per_n_epoch == 0 and iteration == 0:
+                	draw(imgs, l_list, existence, predicted, self.batch_size, self.agent_num, self.glimpse_size, self.glimpse_num, epoch, 'train')
                 
                 reward_list.append(torch.sum(reward)/len(reward))
                 reward = reward.unsqueeze(1).repeat(1,self.glimpse_num,1)
@@ -150,7 +153,7 @@ class Trainer:
                 #mean along all batch then sum up
                 loss_baseline = F.mse_loss(baselines, reward) #critic
                 loss_action = F.nll_loss(log_probs, existence) #classification
-                loss_reinforce = loss_reinforce*1
+                loss_reinforce = loss_reinforce*0.1
                 loss = loss_action + loss_reinforce + loss_baseline
                 #loss = loss_action + loss_reinforce*0.001
                 
@@ -199,7 +202,8 @@ class Trainer:
             reward = (predicted.detach() == existence).float()
             reward = self.weighted_reward(reward, alpha).to(self.device)
             
-            #draw(imgs, l_list, existence, predicted, epoch, self.glimpse_size, self.agent_num)
+            if epoch % self.draw_per_n_epoch == 0:
+                draw(imgs, l_list, existence, predicted, self.batch_size, self.agent_num, self.glimpse_size, self.glimpse_num, epoch, 'val', iteration)
             
             reward_list.append(torch.sum(reward)/len(reward))
             reward = reward.unsqueeze(1).repeat(1,self.glimpse_num,1)
@@ -213,7 +217,7 @@ class Trainer:
             #mean along all batch then sum up
             loss_baseline = F.mse_loss(baselines, reward) #critic
             loss_action = F.nll_loss(log_probs, existence) #classification
-            loss_reinforce = loss_reinforce*1
+            loss_reinforce = loss_reinforce*0.1
             loss = loss_action + loss_reinforce + loss_baseline
             #loss = loss_action + loss_reinforce*0.001
             
