@@ -8,10 +8,26 @@ from torch.distributions import Normal
 
 class Retina:
     
-    def __init__(self, glimpse_size):
+    def __init__(self, k, s, glimpse_size):
         self.g = glimpse_size
+        self.k = k
+        self.s = s
     
-    def extract_patch(self, x, l):
+    def foveate(self, x, l):
+        phi = []
+        size = self.g
+        for i in range (self.k):
+            phi.append(self.extract_patch(x, l, size))
+            size = int(self.s * size)
+        for i in range(1, len(phi)):
+            k = phi[i].shape[-1] // self.g
+            phi[i] = F.avg_pool2d(phi[i], k)
+        phi = torch.cat(phi, 1)
+        phi = phi.view(phi.shape[0], -1)
+
+        return phi
+
+    def extract_patch(self, x, l, size):
         """
         x: (b,h,w,c) input image batch
         l: (b, 2) loaction
@@ -19,13 +35,13 @@ class Retina:
         """
         b, c, h, w = x.shape
         start = self.denormalize(h, l)
-        end = start + self.g
+        end = start + size
 
-        x = F.pad(x, (self.g//2, self.g//2, self.g//2, self.g//2))
+        x = F.pad(x, (size//2+1, size//2+1, size//2+1, size//2+1))
         patch = []
         for i in range(b):
             patch.append(x[i, : , start[i, 1] : end[i, 1], start[i, 0] : end[i, 0]])
-        return self.flatten(torch.stack(patch))
+        return torch.stack(patch)
 
     def flatten(self, input_tensor):
         flat = []
@@ -44,28 +60,31 @@ class GlimpseNetwork(nn.Module):
     """
         h_g: hidden layer for glimpse
         h_l: hidden layer for location
+        k: num of patch
+        s: scale factor of each subsequent patch (should be > 1)
         l_pre: location(l) of previous time step
     """
     
-    def __init__(self, name, ckpt_dir,  h_g, h_l, glimpse_size, c, device):
+    def __init__(self, name, ckpt_dir, h_g, h_l, k, s, glimpse_size, c, device):
         super().__init__()
         self.ckpt_path = os.path.join(ckpt_dir, name)
         self.best_ckpt_path = os.path.join(ckpt_dir, "best_" + name)
-        self.retina = Retina(glimpse_size)
-        dimension = glimpse_size * glimpse_size * c
+        self.retina = Retina(k, s, glimpse_size)
+        
+        dimension = k * glimpse_size * glimpse_size * c
         self.fc1 = nn.Linear(dimension, h_g)
-
         dimension = 2
         self.fc2 = nn.Linear(dimension, h_l)
+
 
         self.fc3 = nn.Linear(h_g, h_g + h_l)
         self.fc4 = nn.Linear(h_l, h_g + h_l)
         self.to(device)
 
     def forward(self, x, l_prev):
-        glimpse = self.retina.extract_patch(x, l_prev)
+        glimpse = self.retina.foveate(x, l_prev)
         l_prev = l_prev.view(l_prev.size(0), -1)
-
+        
         g_out = F.relu(self.fc1(glimpse))
         l_out = F.relu(self.fc2(l_prev))
 
@@ -280,3 +299,15 @@ class ActionNetwork(nn.Module):
         action = F.log_softmax(self.fc(h_t), dim=1)
         
         return action
+
+class TerminationNetwork(nn.Module):
+    def __init__(self, hidden_size):
+        super().__init__()
+        self.fc = nn.Linear(hidden_size, 1)
+    
+    def forward(self, h_t):
+        prob = self.fc(h_t.detach())
+        prob = torch.sigmoid(prob)
+        prob = torch.mean(prob)
+
+        return prob

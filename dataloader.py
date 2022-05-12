@@ -5,12 +5,13 @@ import numpy as np
 import math
 from torch.utils.data import DataLoader
 from torch.utils.data.dataset import Dataset
+from torchvision import transforms
 from bbox import mask_valid_boxes, constraint_theta
 
 
 class HRSC2016(Dataset):
 
-    def __init__(self, name_path, level=1, binary=True):
+    def __init__(self, name_path, level=1, binary=True, augment=False):
         self.image_names_path = name_path
         self.civilian_dict = {'01','04','18','20','22','24','25','26','29','30'}
         self.warship_dict = {'03','07','08','09','10','11','15','19','28'}
@@ -25,11 +26,25 @@ class HRSC2016(Dataset):
             self.classes = ('No_Object', 'Object_Detected')
         self.class_num = len(self.classes)
         self.class_to_index = dict(zip(self.classes, range(self.class_num)))
-        self.augment = False
+        self.augment = augment
+        self.transform = transforms.Compose([
+            transforms.ToPILImage(),
+            transforms.RandomHorizontalFlip(0.5),
+            transforms.RandomVerticalFlip(0.5),
+            transforms.RandomGrayscale(0.5),
+            transforms.ToTensor()
+            ])
     
     def __getitem__(self, index):
         img_path = self.image_list[index]
         img = cv.cvtColor(cv.imread(img_path, cv.IMREAD_COLOR), cv.COLOR_BGR2RGB)
+        if self.augment:
+            array = self.transform(img).numpy()
+            maxValue = array.max()
+            array = array*255/maxValue
+            img = np.uint8(array)
+            img = img.transpose(1,2,0)
+            img = cv.cvtColor(img, cv.COLOR_BGR2RGB)
         if self.binary:
             existence = self._load_annotation(self.image_list[index])
             return {'image': img, 'existence': existence, 'path': img_path}

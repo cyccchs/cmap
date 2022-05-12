@@ -51,8 +51,7 @@ class Normailize(object):
     def __init__(self):
         # RGB: https://github.com/pytorch/vision/issues/223
         self._transform = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))  # 均值和方差
+            transforms.ToTensor()
         ])
 
     def __call__(self, im):
@@ -73,10 +72,10 @@ class Reshape(object):
         return ims
 
 def denormalize(input_tensor):
-    inverse = transforms.Compose([transforms.Normalize((0.,0.,0.),
-                                                        (1/0.229, 1/0.224, 1/0.225)),
-                                transforms.Normalize((-0.485,-0.456,-0.406),
-                                                    (1.,1.,1.))])
+    inverse = transforms.Compose([
+        transforms.Normalize((0., 0., 0.), (1/0.229, 1/0.224, 1/0.225)),
+        transforms.Normalize((-0.485, -0.456, -0.406), (1., 1., 1.))
+    ])
     return inverse(input_tensor)
 
 def draw_text(src, exist, pred):
@@ -86,16 +85,18 @@ def draw_text(src, exist, pred):
     cv2.putText(src, text1, (20,20), font, 0.8, (0,0,255), 2)
     cv2.putText(src, text2, (20,45), font, 0.8, (0,0,255), 2)
 
-def draw_glimpse(src, x, y, size):
-    start_x = round(x-size/2)
-    start_y = round(y-size/2)
-    end_x = round(x+size/2)
-    end_y = round(y+size/2)
-    cv2.rectangle(src, (start_x, start_y), (end_x, end_y), (0,0,255), 2)  
+def draw_glimpse(src, x, y, k, s, size):
+    for i in range(k):
+        start_x = round(x-size/2)
+        start_y = round(y-size/2)
+        end_x = round(x+size/2)
+        end_y = round(y+size/2)
+        cv2.rectangle(src, (start_x, start_y), (end_x, end_y), (0,0,255), 1)
+        size = size * s
     
     
 
-def draw(imgs, l_list, exist, pred, batch_size, agent_num, g_size, g_num, epoch, name, batch=0):
+def draw(imgs, l_list, exist, pred, batch_size, agent_num, g_size, g_num, k, s, epoch, name, batch=0):
     #imgs: [batch_size,channel,width,height]
     #l_list: [glimpse_num, agent_num, [batch_size, location]]
     imgs = imgs.cpu()
@@ -115,15 +116,15 @@ def draw(imgs, l_list, exist, pred, batch_size, agent_num, g_size, g_num, epoch,
         mat_list = []
         for j in range(g_num):
             mat = src.copy()
-            for k in range(agent_num):
-                x = round((l_list[j][k][i][0].item() + 1) * 800 / 2)
-                y = round((l_list[j][k][i][1].item() + 1) * 800 / 2)
-                draw_glimpse(mat, x, y, g_size)
+            for l in range(agent_num):
+                x = round((l_list[j][l][i][0].item() + 1) * 32 / 2)
+                y = round((l_list[j][l][i][1].item() + 1) * 32 / 2)
+                draw_glimpse(mat, x, y, k, s, g_size)
             mat_list.append(mat)
         output = mat_list[0]
         for j in range(len(mat_list)-1):
             output = np.hstack((output,mat_list[j+1]))
-        output = cv2.resize(output, (1920, round(1920/g_num)))
+        output = cv2.resize(output, (300*g_num, 300))
         draw_text(output, exist[i], pred[i])
         #cv2.imshow('result', output)
         #cv2.waitKey(1)
