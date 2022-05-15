@@ -44,7 +44,11 @@ class Trainer:
             self.device = torch.device('cpu')
         self.draw_per_n_epoch = 50
         self.save_ckpt_per_n_epoch = 50
-        self.resume = False
+        self.train_terminate = True
+        self.resume = True
+        self.duration = 99999
+        self.save_gap = 300
+        self.epoch_time = 0.0
         self.best_val_acc = 0.0
         self.test_num = 25
         self.start_epoch = 0
@@ -75,7 +79,7 @@ class Trainer:
 
         self.model = MultiAgentRecurrentAttention(
                     ckpt_dir = self.ckpt_dir,
-                    batch_size=self.batch_size,
+                    batch_size = self.batch_size,
                     agent_num = self.agent_num,
                     h_g = 128,
                     h_l = 128,
@@ -134,14 +138,16 @@ class Trainer:
             writer.add_scalar('val glimpse number', val_g_num, epoch)
             writer.add_scalar('val loss', val_loss, epoch)
             writer.flush()
-            if epoch % self.save_ckpt_per_n_epoch == 0:
+            #if epoch % self.save_ckpt_per_n_epoch == 0:
+            if self.duration > self.save_gap:
+                self.duration = 0
                 self.save_ckpt(
 						{
 							"epoch": epoch +1,
 							"model_state": self.model.state_dict(),
 							"optim_state": self.optimizer.state_dict(),
 						}, is_best)
-
+            self.duration = self.duration + self.epoch_time
 
     def train_one_epoch(self, epoch):
         self.model.train()
@@ -159,7 +165,7 @@ class Trainer:
                 existence = labels.to(self.device)
                 self.optimizer.zero_grad()
                 
-                prob_ts, terminate_ts, T_reward_ts, l_list, b_list, log_pi_list, log_probs, alpha, g_num = self.model(imgs)
+                prob_ts, terminate_ts, T_reward_ts, l_list, b_list, log_pi_list, log_probs, alpha, g_num = self.model(imgs, self.train_terminate)
 
                 log_pi_all = torch.stack(log_pi_list, dim=1) #[batch_size, time_step, agent_num]
                 baselines = torch.stack(b_list, dim=1) #[batch_size, time_step, agent_num]
@@ -168,7 +174,8 @@ class Trainer:
                 terminate_reward = self.terminate_reward_function(T_reward_ts, reward, g_num)
                 reward = self.weighted_reward(reward, alpha).to(self.device)
                 
-                if epoch % self.draw_per_n_epoch == 0 and iteration == 0:
+                #if epoch % self.draw_per_n_epoch == 0 and iteration == 0:
+                if self.duration > self.save_gap and iteration == 0:
                 	draw(imgs, l_list, existence, predicted, self.batch_size, self.agent_num, self.glimpse_size, g_num, self.patch_num, self.scale, epoch, 'train')
                 
                 reward_list.append(torch.mean(reward))
@@ -213,9 +220,10 @@ class Trainer:
                 loss.backward()
                 self.optimizer.step()
                 end_t = time.time()
+                self.epoch_time = end_t - start_t
                 pbar.set_description(
                         ("{:.1f}s - loss: {:.2f} - acc: {:.2f}".format(
-                            (end_t - start_t), avg_loss, avg_acc)
+                            self.epoch_time, avg_loss, avg_acc)
                         )
                 )
                 iteration = iteration + 1
@@ -230,7 +238,7 @@ class Trainer:
             imgs = images.to(self.device)
             existence = labels.to(self.device)
             
-            prob_ts, terminate_ts, T_reward_ts, l_list, b_list, log_pi_list, log_probs, alpha, g_num = self.model(imgs)
+            prob_ts, terminate_ts, T_reward_ts, l_list, b_list, log_pi_list, log_probs, alpha, g_num = self.model(imgs, self.train_terminate)
 
             log_pi_all = torch.stack(log_pi_list, dim=1) #[batch_size, time_step, agent_num]
             baselines = torch.stack(b_list, dim=1) #[batch_size, time_step, agent_num]
@@ -239,7 +247,8 @@ class Trainer:
             terminate_reward = self.terminate_reward_function(T_reward_ts, reward, g_num)
             reward = self.weighted_reward(reward, alpha).to(self.device)
             
-            if epoch % self.draw_per_n_epoch == 0 and iteration == 0:
+            #if epoch % self.draw_per_n_epoch == 0 and iteration == 0:
+            if self.duration > self.save_gap and iteration == 0:
                 draw(imgs, l_list, existence, predicted, self.batch_size, self.agent_num, self.glimpse_size, g_num, self.patch_num, self.scale, epoch, 'val', iteration)
             
             reward_list.append(torch.mean(reward))

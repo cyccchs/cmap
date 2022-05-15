@@ -32,9 +32,11 @@ class MultiAgentRecurrentAttention(nn.Module):
 
         return init_l_list, init_h
 
-    def ram_loop(self, img, h_t, l_t, count, last=False):
+    def ram_loop(self, img, h_t, l_t, count, train_terminate):
         g_list, b_list, l_list, log_pi_list = [], [], [], []
         log_probas = -1
+        last = False
+        stop = False
         for i in range(self.agent_num):
             g_list.append(self.agents[i].glimpse_feature(img, l_t[i]))
         #g_list: len = agent_num, [b, hidden_size] in each element size
@@ -45,7 +47,9 @@ class MultiAgentRecurrentAttention(nn.Module):
         #h_t = self.lstm(z_t, h_t)
         h_t = self.rnn(z_t, h_t)
         prob = self.termination(h_t)
-        if prob.cpu().detach().numpy() > torch.rand(1).numpy() or count == self.glimpse_num - 1:
+        if train_terminate:
+            stop = prob.cpu().detach().numpy() > torch.rand(1).numpy()
+        if stop or count == self.glimpse_num - 1:
             last = True
         
         for i in range(self.agent_num):
@@ -67,7 +71,7 @@ class MultiAgentRecurrentAttention(nn.Module):
         return h_t, prob, l_list, b_t, log_pi_t, log_probas, alpha, last
 
 
-    def forward(self, img):
+    def forward(self, img, train_terminate):
         l_t, h_t = self.reset()
         l_list, b_list, log_pi_list = [], [], []
         prob_list, terminate_list, T_reward_list= [], [], []
@@ -76,7 +80,7 @@ class MultiAgentRecurrentAttention(nn.Module):
         prob = prob.to(self.device)
         g_num = 0
         for i in range(self.glimpse_num):
-            h_t, prob, l_t, b_t, log_pi_t, log_probas, alpha, last = self.ram_loop(img, h_t, l_t, i)
+            h_t, prob, l_t, b_t, log_pi_t, log_probas, alpha, last = self.ram_loop(img, h_t, l_t, i, train_terminate)
             prob_list.append(prob)
             if last:
                 terminate_list.append(torch.ones(1).to(self.device))
