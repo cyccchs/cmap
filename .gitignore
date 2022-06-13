@@ -1,3 +1,4 @@
+__pycache__
 archive
 current_data
 HRSC2016*
@@ -6,4 +7,4 @@ dataset
 plots
 results
 runs
-ckpt
+ckpt*
