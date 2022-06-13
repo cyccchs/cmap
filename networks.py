@@ -1,4 +1,5 @@
 import os
+import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -98,6 +99,7 @@ class GlimpseNetwork(nn.Module):
     def save_ckpt(self, is_best):
         if is_best:
             torch.save(self.state_dict(), self.best_ckpt_path)
+            torch.save(self.state_dict(), self.ckpt_path)
         else:
             torch.save(self.state_dict(), self.ckpt_path)
     def load_ckpt(self, is_best):
@@ -124,29 +126,27 @@ class LocationNetwork(nn.Module):
         self.best_ckpt_path = os.path.join(ckpt_dir, "best_" + name)
 
         self.std = std
-        hidden_size = input_size // 2
-        self.fc = nn.Linear(input_size, hidden_size)
-        self.fc_lt = nn.Linear(input_size, output_size)
+        self.fc = nn.Linear(input_size, output_size)
+        torch.nn.init.normal_(self.fc.weight.data, 0.0, 0.2)
         self.to(device)
 
-    def forward(self, s_t):
-        #feat = F.relu(self.fc(s_t.detach()))
-        #mu = torch.tanh(self.fc_lt(s_t.detach()))
-        mu = torch.tanh(self.fc_lt(s_t))
-
+    def forward(self, s_t, sampling):
+        
+        mu = self.fc(s_t.detach())
+        #mu = self.fc(s_t)
         l_t = Normal(mu, self.std).rsample()
-        #l_t = torch.tensor([[0.75, -0.75],[0.75, -0.75],[0.75, -0.75]])
-        #l_t = torch.tensor([[0.75, -0.75],[0.75, -0.75]])
-        l_t = l_t.detach()
-        log_pi = Normal(mu, self.std).log_prob(l_t)
+        l_t = torch.clamp(l_t, -1.0, 1.0)
+        log_pi = Normal(mu, self.std).log_prob(l_t.detach())
         log_pi = torch.sum(log_pi, dim=1)
-        l_t = torch.clamp(l_t, -1, 1)
-
-        return log_pi, l_t
+        if sampling:
+            return log_pi, l_t
+        else:
+            return log_pi, torch.clamp(mu, -1.0, 1.0)
     
     def save_ckpt(self, is_best):
         if is_best:
             torch.save(self.state_dict(), self.best_ckpt_path)
+            torch.save(self.state_dict(), self.ckpt_path)
         else:
             torch.save(self.state_dict(), self.ckpt_path)
     def load_ckpt(self, is_best):
@@ -174,13 +174,14 @@ class BaselineNetwork(nn.Module):
     def forward(self, s_t):
         #b = self.fc(s_t.detach())
         b = self.fc(s_t)
-        b = torch.squeeze(b)
+        b = torch.squeeze(b, 1)
         
         return b
     
     def save_ckpt(self, is_best):
         if is_best:
             torch.save(self.state_dict(), self.best_ckpt_path)
+            torch.save(self.state_dict(), self.ckpt_path)
         else:
             torch.save(self.state_dict(), self.ckpt_path)
     def load_ckpt(self, is_best):
@@ -200,29 +201,16 @@ class CoreNetwork(nn.Module): #CCI(LSTM cell)
 
         h_t: 2D tensor of shape (B, hidden_size). Hidden state for current timestep.
     """
-    """ 
-    def __init__(self, batch_size, lstm_size, device):
+    
+    def __init__(self, batch_size, hidden_size, device):
         super().__init__()
 
-        self.lstm = nn.LSTMCell(lstm_size, lstm_size)
-        self.h = torch.zeros(batch_size, lstm_size, dtype=torch.float32, requires_grad=True, device=device)
-        self.c = torch.zeros(batch_size, lstm_size, dtype=torch.float32, requires_grad=True, device=device)
-    def forward(self, z_t, h_t_prev):
+        self.lstm = nn.LSTMCell(hidden_size, hidden_size)
+    def forward(self, z_t, h_prev, c_prev):
          
-        h_t, self.c = self.lstm(z_t, (h_t_prev,self.c))
+        h_t, c_t = self.lstm(z_t, (h_prev, c_prev))
         
-        return h_t
-    """
-    def __init__(self, input_size, hidden_size):
-        super().__init__()
-        self.i2h = nn.Linear(input_size, hidden_size)
-        self.h2h = nn.Linear(hidden_size, hidden_size)
-    def forward(self, z_t, h_t_prev):
-        h1 = self.i2h(z_t)
-        h2 = self.h2h(h_t_prev)
-        h_t = F.relu(h1 + h2)
-        
-        return h_t
+        return h_t, c_t
 
 class SelfAttention(nn.Module):
     
@@ -243,9 +231,9 @@ class SelfAttention(nn.Module):
         k = self.wk(x) #(b, agent_num, hidden_size)
         v = self.wv(x)
         q_trans = q.permute(0,2,1) #(b, hidden_size, agent_num)
-        a_t = F.softmax(torch.matmul(k, q_trans)/self.size**0.5, dim=0)
+        alpha = F.softmax(torch.matmul(k, q_trans)/self.size**0.5, dim=0)
         #matmul (b, agent_num, agent_num), softmax (b, agent_num, agent_num)
-        s_t = torch.matmul(a_t, v)
+        s_t = torch.matmul(alpha, v)
         #s_t (b, agent_num, hidden_size)
         return s_t
 
@@ -261,8 +249,8 @@ class SoftAttention(nn.Module):
     def forward(self, g_list, h_t):
         #G = torch.stack(g_list) # to represent 4 agents' g_t
         y_list = [torch.tanh(self.wk(g_list[i]) + self.wq(h_t)) for i in range(len(g_list))]
-        m_list = [self.wg(y_list[i]) for i in range(len(g_list))]
-        m_concat = torch.cat([m_list[i] for i in range(len(g_list))], dim=1)
+        m_list = [self.wg(y_list[i]) for i in range(len(y_list))]
+        m_concat = torch.cat([m_list[i] for i in range(len(m_list))], dim=1)
         alpha = F.softmax(m_concat, dim=-1)
         z_list = [torch.mul(g_list[i], torch.index_select(alpha, 1, torch.tensor(i).to(self.device))) for i in range(len(g_list))]
         z_stack = torch.stack(z_list, 2)

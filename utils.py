@@ -96,7 +96,7 @@ def draw_glimpse(src, x, y, k, s, size):
     
     
 
-def draw(imgs, l_list, exist, pred, batch_size, agent_num, g_size, g_num, k, s, epoch, name, batch=0):
+def draw(imgs, l_list, exist, pred, batch_size, agent_num, g_size, g_num, k, s, m, epoch, name, batch=0):
     #imgs: [batch_size,channel,width,height]
     #l_list: [glimpse_num, agent_num, [batch_size, location]]
     imgs = imgs.cpu()
@@ -117,8 +117,8 @@ def draw(imgs, l_list, exist, pred, batch_size, agent_num, g_size, g_num, k, s, 
         for j in range(g_num):
             mat = src.copy()
             for l in range(agent_num):
-                x = round((l_list[j][l][i][0].item() + 1) * 32 / 2)
-                y = round((l_list[j][l][i][1].item() + 1) * 32 / 2)
+                x = round((l_list[j][l][i*m-1][0].item() + 1) * 32 / 2)
+                y = round((l_list[j][l][i*m-1][1].item() + 1) * 32 / 2)
                 draw_glimpse(mat, x, y, k, s, g_size)
             mat_list.append(mat)
         output = mat_list[0]

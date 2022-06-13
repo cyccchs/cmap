@@ -10,12 +10,16 @@ class Agent:
         self.retina = GlimpseNetwork(self.name+"_retina.pth.tar", ckpt_dir, h_g, h_l, k, s, glimpse_size, c, device)
         self.location = LocationNetwork(self.name+"_loc.pth.tar", ckpt_dir, hidden_size, loc_dim, std, device)
         self.baseline = BaselineNetwork(self.name+"_base.pth.tar", ckpt_dir, hidden_size, 1, device)
+        self.train_param =[] 
+        self.train_param.extend(list(self.retina.parameters()))
+        self.train_param.extend(list(self.location.parameters()))
+        self.train_param.extend(list(self.baseline.parameters()))
 
     def glimpse_feature(self,img, l_t):
         return self.retina(img, l_t)
     
-    def location(self, s_t):
-        return self.location(s_t)
+    def location(self, s_t, sampling):
+        return self.location(s_t, sampling)
     
     def baseline(self, s_t):
         return self.baseline(s_t)
