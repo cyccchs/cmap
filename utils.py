@@ -132,4 +132,19 @@ def draw(imgs, l_list, exist, pred, batch_size, agent_num, g_size, g_num, k, s, 
             cv2.imwrite(save_path + '/' + str(i) + '.jpg', output)
         else:
             cv2.imwrite(save_path + '/' + str(batch) + str(i) + '.jpg', output)
-                
+
+class AvgMeter:
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self.val = 0
+        self.avg = 0
+        self.sum = 0
+        self.count = 0
+    
+    def update(self, val, n=1):
+        self.val = val
+        self.sum += val * n
+        self.count += n
+        self.avg = self.sum / self.count

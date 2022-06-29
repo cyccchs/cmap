@@ -127,21 +127,18 @@ class LocationNetwork(nn.Module):
 
         self.std = std
         self.fc = nn.Linear(input_size, output_size)
-        torch.nn.init.normal_(self.fc.weight.data, 0.0, 0.2)
+        torch.nn.init.uniform_(self.fc.weight.data, -1.0, 1.0)
         self.to(device)
 
-    def forward(self, s_t, sampling):
+    def forward(self, s_t):
         
         mu = self.fc(s_t.detach())
-        #mu = self.fc(s_t)
         l_t = Normal(mu, self.std).rsample()
         l_t = torch.clamp(l_t, -1.0, 1.0)
         log_pi = Normal(mu, self.std).log_prob(l_t.detach())
         log_pi = torch.sum(log_pi, dim=1)
-        if sampling:
-            return log_pi, l_t
-        else:
-            return log_pi, torch.clamp(mu, -1.0, 1.0)
+        
+        return log_pi, l_t
     
     def save_ckpt(self, is_best):
         if is_best:

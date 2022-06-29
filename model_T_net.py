@@ -48,6 +48,10 @@ class MultiAgentRecurrentAttention(nn.Module):
         s_t = torch.unbind(s_t, dim=1)  #s_t: agent_num*[batch_size, hidden_size]
         alpha, z_t = self.softatt(g_list, h_prev)
         h_t, c_t = self.lstm(z_t, h_prev, c_prev)
+        prob = self.termination(h_t)
+        stop = prob.cpu().detach().numpy() > torch.rand(1).numpy()
+        if stop or i == self.glimpse_num - 1:
+            last = True
         
         for j in range(self.agent_num):
             log_pi, l_t = self.agents[j].location(s_t[j])
@@ -59,17 +63,29 @@ class MultiAgentRecurrentAttention(nn.Module):
         b_t = torch.stack(b_list, dim=1) #[agent_num, batch_size]
         log_pi_t = torch.stack(log_pi_list, dim=1)
         
-        return h_t, c_t, l_list, b_t, log_pi_t, log_prob, alpha, last
-
+        log_prob = self.classifier(h_t) #[batch_size, class_num]
+        
+        return h_t, c_t, prob, l_list, b_t, log_pi_t, log_prob, alpha, last
 
     def forward(self, img):
         l_prev, h_prev, c_prev = self.reset()
         l_list, b_list, log_pi_list = [], [], []
+        prob_list, terminate_list, log_prob_list = [], [], []
+        prob = torch.zeros(1).to(self.device)
+        T_reward = torch.zeros(1).to(self.device).detach()
         g_num = 0
         
         for i in range(self.glimpse_num):
-            h_t, c_t, l_t, b_t, log_pi_t, log_prob, alpha, last = self.ram_loop(img, h_prev, c_prev, l_prev, i)
+            h_t, c_t, prob, l_t, b_t, log_pi_t, log_prob, alpha, last = self.ram_loop(img, h_prev, c_prev, l_prev, i)
 
+            if last:
+                terminate_list.append(torch.ones(1).to(self.device))
+            else:
+                terminate_list.append(torch.zeros(1).to(self.device))
+            
+            prob_list.append(prob)
+            log_prob_list.append(log_prob)
+            T_reward = T_reward - 0.5
             l_list.append(l_t)
             b_list.append(b_t)
             log_pi_list.append(log_pi_t)
@@ -77,10 +93,13 @@ class MultiAgentRecurrentAttention(nn.Module):
             c_prev = c_t
             l_prev = l_t
             g_num = g_num + 1
-        
-        log_prob = self.classifier(h_t) #[batch_size, class_num]
-        
-        return l_list, b_list, log_pi_list, log_prob, alpha, g_num
+            if last:
+                break
+        prob_ts = torch.stack(prob_list)
+        log_probs = torch.stack(log_prob_list)
+        terminate_ts = torch.stack(terminate_list)
+                
+        return  log_probs, prob_ts, terminate_ts, T_reward, l_list, b_list, log_pi_list, alpha, g_num
     
     def save_agent_ckpt(self, is_best=False):
         print("--------agents saving checkpoint in %s" % self.ckpt_dir)
