@@ -42,7 +42,6 @@ class Trainer:
             self.device = torch.device('cpu')
         self.draw_per_n_epoch = 50
         self.save_ckpt_per_n_epoch = 50
-        self.train_terminate = False
         self.resume = True
         self.pbar_detail = False
         self.M = 10 #monte carlo sample = 10
@@ -98,7 +97,7 @@ class Trainer:
             self.train_param.extend(self.model.agents[i].train_param)
 
         self.optimizer = torch.optim.Adam(self.train_param, lr=0.0001)
-        self.scheduler = StepLR(self.optimizer, step_size=1, gamma=0.99)
+        self.scheduler = StepLR(self.optimizer, step_size=1, gamma=0.995)
 
 
     def weighted_reward(self, reward, alpha):
@@ -114,7 +113,7 @@ class Trainer:
         correct = AvgMeter()
         acc_t = []
         correct_count = 0
-        threshold = 0.6
+        threshold = 0.7
 
         for p in pred:
             for i in range(len(p)):
@@ -126,11 +125,13 @@ class Trainer:
                 correct_count += 1
             
         if acc_t[-1] >= threshold and correct_count == 1:
-            terminate_reward = T_reward + 10
-        if acc_t[-1] >= threshold and correct_count > 1:
             terminate_reward = T_reward + 5
+        if acc_t[-1] >= threshold and correct_count > 1:
+            terminate_reward = T_reward + 3
         if acc_t[-1] < threshold:
-            terminate_reward = T_reward -10
+            terminate_reward = T_reward -3
+        if acc_t[-1] < threshold and correct_count > 0:
+            terminate_reward = T_reward - 5
         return terminate_reward
 
     def train(self):
@@ -154,6 +155,7 @@ class Trainer:
             writer.add_scalar('val acc', val_acc, epoch)
             writer.add_scalar('val glimpse number', val_g_num, epoch)
             writer.add_scalar('val loss', val_loss, epoch)
+            writer.add_scalar('best val acc', self.best_val_acc, epoch)
             writer.flush()
             if self.duration > self.save_gap:
                 self.duration = 0
