@@ -82,16 +82,18 @@ def draw_text(src, exist, pred):
     font = cv2.FONT_HERSHEY_SIMPLEX
     text1 = 'class' + str(exist)
     text2 = 'pred:' + str(pred)
-    cv2.putText(src, text1, (20,20), font, 0.8, (0,0,255), 2)
-    cv2.putText(src, text2, (20,45), font, 0.8, (0,0,255), 2)
+    cv2.putText(src, text1, (5,15), font, 0.7, (0,0,255), 2)
+    cv2.putText(src, text2, (5,35), font, 0.7, (0,0,255), 2)
 
-def draw_glimpse(src, x, y, k, s, size):
+def draw_glimpse(src, x, y, k, s, size, l):
+    font = cv2.FONT_HERSHEY_SIMPLEX
     for i in range(k):
         start_x = round(x-size/2)
         start_y = round(y-size/2)
         end_x = round(x+size/2)
         end_y = round(y+size/2)
-        cv2.rectangle(src, (start_x, start_y), (end_x, end_y), (0,0,255), 1)
+        cv2.rectangle(src, (start_x, start_y), (end_x, end_y), (0,255,60), 1)
+        cv2.putText(src, str(l), (start_x,start_y), font, 0.6, (0,0,255), 2)
         size = size * s
     
     
@@ -116,15 +118,16 @@ def draw(imgs, l_list, exist, pred, batch_size, agent_num, g_size, g_num, k, s, 
         mat_list = []
         for j in range(g_num):
             mat = src.copy()
+            mat = cv2.resize(mat, (320, 320))
             for l in range(agent_num):
-                x = round((l_list[j][l][i*m-1][0].item() + 1) * 32 / 2)
-                y = round((l_list[j][l][i*m-1][1].item() + 1) * 32 / 2)
-                draw_glimpse(mat, x, y, k, s, g_size)
+                x = round((l_list[j][l][i*m-1][0].item() + 1) * 32 / 2 * 10)
+                y = round((l_list[j][l][i*m-1][1].item() + 1) * 32 / 2 * 10)
+                draw_glimpse(mat, x, y, k, s, g_size*10, l)
             mat_list.append(mat)
         output = mat_list[0]
         for j in range(len(mat_list)-1):
             output = np.hstack((output,mat_list[j+1]))
-        output = cv2.resize(output, (300*g_num, 300))
+        output = cv2.resize(output, (320*g_num, 320))
         draw_text(output, exist[i], pred[i])
         #cv2.imshow('result', output)
         #cv2.waitKey(1)

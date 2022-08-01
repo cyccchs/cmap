@@ -113,7 +113,7 @@ class Trainer:
         correct = AvgMeter()
         acc_t = []
         correct_count = 0
-        threshold = 0.7
+        threshold = 0.8
 
         for p in pred:
             for i in range(len(p)):
