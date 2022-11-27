@@ -42,7 +42,7 @@ class Trainer:
             self.device = torch.device('cpu')
         self.draw_per_n_epoch = 50
         self.save_ckpt_per_n_epoch = 50
-        self.resume = True
+        self.resume = False
         self.pbar_detail = False
         self.M = 10 #monte carlo sample = 10
         self.duration = 99999
