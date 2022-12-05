@@ -13,29 +13,32 @@ class MultiAgentRecurrentAttention(nn.Module):
         self.glimpse_num = glimpse_num
         self.hidden_size = hidden_size
         self.device = device
-        self.selfatt = networks.SelfAttention(hidden_size)
         self.softatt = networks.SoftAttention(hidden_size, device)
-        self.lstm = networks.CoreNetwork(batch_size, hidden_size, device)
         self.classifier = networks.ActionNetwork(hidden_size, 10)
         self.termination = networks.TerminationNetwork(hidden_size)
         for i in range(self.agent_num):
-            self.agents.append(Agent(i, ckpt_dir, h_g, h_l, k, s, glimpse_size, c, hidden_size, loc_dim, std, device))
+            self.agents.append(Agent(i, self.agent_num, ckpt_dir, h_g, h_l, k, s, glimpse_size, c, hidden_size, loc_dim, std, device))
     
     def reset(self):
         #init loaction of all agents
         #init hidden state & cell state of lstm cell
-        init_l_list = []
+        init_l_list, init_h_list, init_c_list = [], [], []
+        
         for i in range(self.agent_num):
             init_l = torch.FloatTensor(self.batch_size, 2).uniform_(-1.0, 1.0).to(self.device)
             init_l.requires_grad = True
             init_l_list.append(init_l)
-        init_h = torch.zeros(self.batch_size, self.hidden_size, dtype=torch.float32, device=self.device, requires_grad=True)
-        init_c = torch.zeros(self.batch_size, self.hidden_size, dtype=torch.float32, device=self.device, requires_grad=True)
 
-        return init_l_list, init_h, init_c
+            init_h = torch.zeros(self.batch_size, self.hidden_size, dtype=torch.float32, device=self.device, requires_grad=True)
+            init_h_list.append(init_h)
+
+            init_c = torch.zeros(self.batch_size, self.hidden_size, dtype=torch.float32, device=self.device, requires_grad=True)
+            init_c_list.append(init_c)
+
+        return init_l_list, init_h_list, init_c_list
 
     def ram_loop(self, img, h_prev, c_prev, l_prev, i):
-        g_list, b_list, l_list, log_pi_list = [], [], [], []
+        g_list, b_list, l_list, alpha_list, h_list, c_list, log_pi_list = [], [], [], [], [], [], []
         log_prob = -1
         last = False
         stop = False
@@ -44,18 +47,24 @@ class MultiAgentRecurrentAttention(nn.Module):
             g_list.append(self.agents[j].glimpse_feature(img, l_prev[j]))
             #g_list: agent_num*[b, hidden_size]
         
-        s_t = self.selfatt(g_list)
-        s_t = torch.unbind(s_t, dim=1)  #s_t: agent_num*[batch_size, hidden_size]
-        alpha, z_t = self.softatt(g_list, h_prev)
-        h_t, c_t = self.lstm(z_t, h_prev, c_prev)
-        prob = self.termination(h_t)
+        #s_t = self.selfatt(g_list)
+        #s_t = torch.unbind(s_t, dim=1)  #s_t: agent_num*[batch_size, hidden_size]
+        for j in range(self.agent_num):
+            alpha, z_t = self.softatt(g_list, h_prev[j])
+            h_t, c_t = self.agents[j].lstm(z_t, h_prev[j], c_prev[j])
+            h_list.append(h_t)
+            c_list.append(c_t)
+            alpha_list.append(alpha)
+
+        H_t = torch.stack(h_list)
+        prob = self.termination(H_t)
         stop = prob.cpu().detach().numpy() > torch.rand(1).numpy()
         if stop or i == self.glimpse_num - 1:
             last = True
         
         for j in range(self.agent_num):
-            log_pi, l_t = self.agents[j].location(s_t[j])
-            b = self.agents[j].baseline(s_t[j])
+            log_pi, l_t = self.agents[j].location(alpha_list[j])
+            b = self.agents[j].baseline(alpha_list[j])
             b_list.append(b)
             l_list.append(l_t)
             log_pi_list.append(log_pi)
@@ -63,9 +72,9 @@ class MultiAgentRecurrentAttention(nn.Module):
         b_t = torch.stack(b_list, dim=1) #[agent_num, batch_size]
         log_pi_t = torch.stack(log_pi_list, dim=1)
         
-        log_prob = self.classifier(h_t) #[batch_size, class_num]
+        log_prob = self.classifier(H_t) #[batch_size, class_num]
         
-        return h_t, c_t, prob, l_list, b_t, log_pi_t, log_prob, alpha, last
+        return h_list, c_list, prob, l_list, b_t, log_pi_t, log_prob, alpha, last
 
     def forward(self, img):
         l_prev, h_prev, c_prev = self.reset()
