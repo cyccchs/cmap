@@ -15,6 +15,7 @@ from torch.optim.lr_scheduler import StepLR
 import matplotlib.pyplot as plt
 from torch.utils.tensorboard import SummaryWriter
 from torch.autograd import Variable
+from scipy.stats import entropy
 writer = SummaryWriter()
 gpu = True
 class Trainer:
@@ -109,6 +110,26 @@ class Trainer:
                 reward_list.append(4*alpha[i])
         
         return torch.stack(reward_list, dim=0)
+    
+    def reward_function(self, alpha_list):
+        reward_batch = []
+        reward_agent = []
+        reward_list = []
+
+        for t in alpha_list:
+            for agent in t:
+                for batch in agent:
+                    reward_batch.append(entropy(batch.detach().cpu(), base=self.agent_num))
+                reward_agent.append(torch.mean(torch.FloatTensor(reward_batch)))
+                reward_batch=[]
+            reward_list.append(torch.FloatTensor(reward_agent))
+            reward_agent = []
+        print(reward_list)
+        
+        print('reward list', len(reward_list))
+        
+        return(reward_list)
+
     def terminate_reward_function(self, T_reward, pred, label):
         correct = AvgMeter()
         acc_t = []
@@ -160,11 +181,11 @@ class Trainer:
             if self.duration > self.save_gap:
                 self.duration = 0
                 self.save_ckpt(
-						{
-							"epoch": epoch +1,
-							"model_state": self.model.state_dict(),
-							"optim_state": self.optimizer.state_dict(),
-						}, is_best)
+				{
+				    "epoch": epoch +1,
+				    "model_state": self.model.state_dict(),
+				    "optim_state": self.optimizer.state_dict(),
+				}, is_best)
             self.duration = self.duration + self.epoch_time
 
     def train_one_epoch(self, epoch):
@@ -187,12 +208,14 @@ class Trainer:
                 label = labels.to(self.device)
                 self.optimizer.zero_grad(set_to_none=True)
                 
-                log_probs, prob_ts, terminate_ts, T_reward_ts, l_list, b_list, log_pi_list, alpha, g_num = self.model(imgs)
+                log_probs, prob_ts, terminate_ts, T_reward_ts, l_list, b_list, log_pi_list, alpha_list, g_num = self.model(imgs)
                 #l_list[time_step, agent_num, [batch_size, 2]]
                 log_pi = torch.stack(log_pi_list, dim=1) #[batch_size, time_step, agent_num]
                 log_pi = log_pi.reshape((self.M, -1, log_pi.shape[-2], log_pi.shape[-1]))#[M, batch_size, time_step, agent_num]
                 log_pi = torch.mean(log_pi, dim=0)#[batch_size, time_step, agent_num]
-                baselines = torch.stack(b_list, dim=1) 
+                baselines = torch.stack(b_list, dim=1)
+                print('number of glimpse', g_num)
+                print(baselines.shape)
                 baselines = baselines.reshape((self.M, -1, baselines.shape[-2], baselines.shape[-1]))#[M, batch_size, time_step, agent_num]
                 baselines = torch.mean(baselines, dim=0)
                 #log_probs = torch.stack(log_prob_list, dim=1)
@@ -201,11 +224,9 @@ class Trainer:
                 predicted = torch.max(log_probs, 2)[1]  #indices store in element[1]
                 correct = (predicted[-1] == label).float().detach()
                 terminate_reward = self.terminate_reward_function(T_reward_ts, predicted.detach(), label)
-                reward = self.weighted_reward(correct, alpha)
-                
-                
-                
-                reward = reward.unsqueeze(1).repeat(1,g_num,1) #[batch_size, time_step, agent_num]
+                reward = self.reward_function(alpha_list)
+                 
+                #reward = reward_tensor.unsqueeze(1).repeat(1,g_num,1) #[batch_size, time_step, agent_num]
                 adjusted_reward = reward - baselines.detach()
                 
                 loss_reinforce = torch.sum(-log_pi * adjusted_reward, dim=1)#sum along all glimpses
