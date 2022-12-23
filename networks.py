@@ -130,9 +130,9 @@ class LocationNetwork(nn.Module):
         torch.nn.init.uniform_(self.fc.weight.data, -1.0, 1.0)
         self.to(device)
 
-    def forward(self, alpha):
+    def forward(self, g_t):
         
-        mu = self.fc(alpha.detach())
+        mu = self.fc(g_t.detach())
         l_t = Normal(mu, self.std).rsample()
         l_t = torch.clamp(l_t, -1.0, 1.0)
         log_pi = Normal(mu, self.std).log_prob(l_t.detach())
