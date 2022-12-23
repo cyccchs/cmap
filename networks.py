@@ -168,9 +168,8 @@ class BaselineNetwork(nn.Module):
         self.fc = nn.Linear(input_size, output_size)
         self.to(device)
 
-    def forward(self, s_t):
-        #b = self.fc(s_t.detach())
-        b = self.fc(s_t)
+    def forward(self, alpha):
+        b = self.fc(alpha.detach())
         b = torch.squeeze(b, 1)
         
         return b

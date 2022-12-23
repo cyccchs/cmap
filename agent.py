@@ -15,6 +15,7 @@ class Agent:
         self.train_param.extend(list(self.retina.parameters()))
         self.train_param.extend(list(self.location.parameters()))
         self.train_param.extend(list(self.baseline.parameters()))
+        self.train_param.extend(list(self.lstm.parameters()))
 
     def glimpse_feature(self,img, l_t):
         return self.retina(img, l_t)
