@@ -239,6 +239,7 @@ class SoftAttention(nn.Module):
         m_list = [self.wg(y_list[i]) for i in range(len(y_list))]
         m_concat = torch.cat([m_list[i] for i in range(len(m_list))], dim=1)
         alpha = F.softmax(m_concat, dim=-1)
+        #######################
         z_list = [torch.mul(g_list[i], torch.index_select(alpha, 1, torch.tensor(i).to(self.device))) for i in range(len(g_list))]
         z_stack = torch.stack(z_list, 2)
         z_t = torch.sum(z_stack, 2) #similar to reduce_sum

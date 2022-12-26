@@ -16,6 +16,9 @@ import matplotlib.pyplot as plt
 from torch.utils.tensorboard import SummaryWriter
 from torch.autograd import Variable
 from scipy.stats import entropy
+import numpy as np
+from torch.distributions import Categorical
+
 writer = SummaryWriter()
 gpu = True
 class Trainer:
@@ -55,7 +58,7 @@ class Trainer:
         self.glimpse_size = 8
         self.scale = 1.0
         self.patch_num = 1
-        self.glimpse_num = 6
+        self.glimpse_num = 4
         self.agent_num = 4
         self.epoch_num = 400
         self.ckpt_dir = "./ckpt"
@@ -119,16 +122,20 @@ class Trainer:
         for t in alpha_list:
             for agent in t:
                 for batch in agent:
-                    reward_batch.append(entropy(batch.detach().cpu(), base=self.agent_num))
-                reward_agent.append(torch.mean(torch.FloatTensor(reward_batch)))
+                    reward_batch.append(entropy(batch.detach().cpu()))
+
+                reward_batch = torch.FloatTensor(reward_batch).view(self.M, self.batch_size)
+                #print('reward batch shape: ', reward_batch.shape)
+                reward_agent.append(torch.mean(reward_batch, dim=0).numpy())
                 reward_batch=[]
-            reward_list.append(torch.FloatTensor(reward_agent))
+            #print('reward agent len: ', len(reward_agent))
+            reward_numpy = np.array(reward_agent)
+            reward_list.append(torch.FloatTensor(reward_numpy))
             reward_agent = []
-        print(reward_list)
-        
-        print('reward list', len(reward_list))
-        
-        return(reward_list)
+        reward_tensor = torch.stack(reward_list).permute(2,0,1)
+        #print('reward_list tensor shape: ', reward_tensor.shape)
+
+        return(reward_tensor.to(self.device))
 
     def terminate_reward_function(self, T_reward, pred, label):
         correct = AvgMeter()
@@ -214,8 +221,6 @@ class Trainer:
                 log_pi = log_pi.reshape((self.M, -1, log_pi.shape[-2], log_pi.shape[-1]))#[M, batch_size, time_step, agent_num]
                 log_pi = torch.mean(log_pi, dim=0)#[batch_size, time_step, agent_num]
                 baselines = torch.stack(b_list, dim=1)
-                print('number of glimpse', g_num)
-                print(baselines.shape)
                 baselines = baselines.reshape((self.M, -1, baselines.shape[-2], baselines.shape[-1]))#[M, batch_size, time_step, agent_num]
                 baselines = torch.mean(baselines, dim=0)
                 #log_probs = torch.stack(log_prob_list, dim=1)
@@ -238,7 +243,8 @@ class Trainer:
                 prob_ts = torch.unsqueeze(prob_ts, 1)
                 loss_terminate = F.binary_cross_entropy_with_logits(prob_ts, terminate_ts)
                 loss_terminate = torch.mean(loss_terminate * terminate_reward)
-                loss = loss_action + loss_reinforce + loss_baseline + loss_terminate
+                #loss = loss_action + loss_reinforce + loss_baseline + loss_terminate
+                loss = loss_action + loss_reinforce + loss_baseline
                 
                 avg_acc.update(correct.mean().item())
                 avg_loss.update(loss.item())
@@ -272,7 +278,7 @@ class Trainer:
             label = labels.to(self.device)
             
             #prob_ts, terminate_ts, T_reward_ts, l_list, b_list, log_pi_list, log_probs, alpha, g_num = self.model(imgs, self.train_terminate, sampling=False)
-            log_probs, prob_ts, terminate_ts, T_reward_ts, l_list, b_list, log_pi_list, alpha, g_num = self.model(imgs)
+            log_probs, prob_ts, terminate_ts, T_reward_ts, l_list, b_list, log_pi_list, alpha_list, g_num = self.model(imgs)
             #l_list, b_list, log_pi_list, log_probs, alpha, g_num = self.model(imgs)
 
             log_pi = torch.stack(log_pi_list, dim=1) #[batch_size, time_step, agent_num]
@@ -287,10 +293,10 @@ class Trainer:
             predicted = torch.max(log_probs, 2)[1]  #indices store in element[1]
             correct = (predicted[-1] == label).float().detach()
             terminate_reward = self.terminate_reward_function(T_reward_ts, predicted.detach(), label)
-            reward = self.weighted_reward(correct, alpha)
+            reward = self.reward_function(alpha_list)
             
             
-            reward = reward.unsqueeze(1).repeat(1,g_num,1)
+            #reward = reward.unsqueeze(1).repeat(1,g_num,1)
             #reward[batch_size, time_step, agent_num]
             adjusted_reward = reward - baselines.detach()
             
@@ -304,7 +310,8 @@ class Trainer:
             prob_ts = torch.unsqueeze(prob_ts, 1)
             loss_terminate = F.binary_cross_entropy_with_logits(prob_ts, terminate_ts)
             loss_terminate = torch.mean(loss_terminate * terminate_reward)
-            loss = loss_action + loss_reinforce + loss_baseline + loss_terminate
+            #loss = loss_action + loss_reinforce + loss_baseline + loss_terminate
+            loss = loss_action + loss_reinforce + loss_baseline
             
             avg_acc.update(correct.mean().item())
             avg_loss.update(loss.item())

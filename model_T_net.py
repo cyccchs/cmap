@@ -29,7 +29,7 @@ class MultiAgentRecurrentAttention(nn.Module):
             init_l.requires_grad = True
             init_l_list.append(init_l)
 
-            init_h = torch.zeros(self.batch_size, self.hidden_size, dtype=torch.float32, device=self.device, requires_grad=True)
+            init_h = torch.randn(self.batch_size, self.hidden_size, dtype=torch.float32, device=self.device, requires_grad=True)
             init_h_list.append(init_h)
 
             init_c = torch.zeros(self.batch_size, self.hidden_size, dtype=torch.float32, device=self.device, requires_grad=True)
@@ -59,7 +59,8 @@ class MultiAgentRecurrentAttention(nn.Module):
         H_t = torch.stack(h_list)
         prob = self.termination(H_t)
         stop = prob.cpu().detach().numpy() > torch.rand(1).numpy()
-        if stop or i == self.glimpse_num - 1:
+        #if stop or i == self.glimpse_num - 1:
+        if i == self.glimpse_num - 1:
             last = True
         
         for j in range(self.agent_num):
