@@ -126,17 +126,20 @@ class LocationNetwork(nn.Module):
         self.best_ckpt_path = os.path.join(ckpt_dir, "best_" + name)
 
         self.std = std
-        self.fc = nn.Linear(input_size, output_size)
-        torch.nn.init.uniform_(self.fc.weight.data, -1.0, 1.0)
+        hidden_size = input_size // 2
+        self.fc_feat = nn.Linear(input_size, hidden_size)
+        self.fc_mu = nn.Linear(hidden_size, output_size)
         self.to(device)
 
     def forward(self, g_t):
-        
-        mu = self.fc(g_t.detach())
-        l_t = Normal(mu, self.std).rsample()
-        l_t = torch.clamp(l_t, -1.0, 1.0)
-        log_pi = Normal(mu, self.std).log_prob(l_t.detach())
+        feat = self.fc_feat(g_t.detach())
+        mu = torch.tanh(self.fc_mu(feat))
+        l_t = torch.tanh(Normal(mu, self.std).rsample())
+        l_t = l_t.detach()
+        log_pi = Normal(mu, self.std).log_prob(l_t)
         log_pi = torch.sum(log_pi, dim=1)
+
+        l_t = torch.clamp(l_t, -1, 1)
         
         return log_pi, l_t
     
