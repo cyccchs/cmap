@@ -284,7 +284,7 @@ class Trainer:
                     prob_list.append(prob)
                     log_prob_list.append(log_prob)
                     T_reward = T_reward - 0.5
-                    l_list.append(l_t)
+                    l_list.append(l_prev)
                     b_list.append(b_t)
                     log_pi_list.append(log_pi_t)
                     h_prev = h_t
@@ -369,7 +369,7 @@ class Trainer:
                 prob_list.append(prob)
                 log_prob_list.append(log_prob)
                 T_reward = T_reward - 0.5
-                l_list.append(l_t)
+                l_list.append(l_prev)
                 b_list.append(b_t)
                 log_pi_list.append(log_pi_t)
                 h_prev = h_t
