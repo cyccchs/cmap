@@ -28,6 +28,7 @@ class MultiAgentRecurrentAttention(nn.Module):
         
         for j in range(self.agent_num):
             g_list.append(self.agents[j].glimpse_feature(img, l_prev[j]))
+            l_list.append(l_prev[j])
             #g_list: agent_num*[b, hidden_size]
         
         #s_t = self.selfatt(g_list)
@@ -50,7 +51,7 @@ class MultiAgentRecurrentAttention(nn.Module):
             log_pi, l_t = self.agents[j].location(g_list[j])
             b = self.agents[j].baseline(g_list[j])
             b_list.append(b)
-            l_list.append(l_t)
+            #l_list.append(l_t)
             log_pi_list.append(log_pi)
         
         b_t = torch.stack(b_list, dim=1) #[agent_num, batch_size]

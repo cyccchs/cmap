@@ -134,7 +134,7 @@ class LocationNetwork(nn.Module):
     def forward(self, g_t):
         feat = self.fc_feat(g_t.detach())
         mu = torch.tanh(self.fc_mu(feat))
-        l_t = torch.tanh(Normal(mu, self.std).rsample())
+        l_t = Normal(mu, self.std).rsample()
         l_t = l_t.detach()
         log_pi = Normal(mu, self.std).log_prob(l_t)
         log_pi = torch.sum(log_pi, dim=1)

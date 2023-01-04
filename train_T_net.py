@@ -1,11 +1,9 @@
 import os
 import shutil
 import time
-from dataloader import HRSC2016
 from tqdm import tqdm
 from torch.utils.data import DataLoader
 from torch.utils.data.dataset import Dataset
-from collater_nobox import *
 from model_T_net import *
 from utils import draw, AvgMeter
 import torch.nn.functional as F
@@ -39,7 +37,6 @@ class Trainer:
             transform = self.transform,
             download = True
         )
-        self.collater = Collater(scales=32)
         if gpu and torch.cuda.is_available():
             self.device = torch.device('cuda')
         else:
