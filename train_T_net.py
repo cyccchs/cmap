@@ -174,12 +174,14 @@ class Trainer:
         
         log_pi = log_pi.view(self.M, self.batch_size, -1)
         log_pi = torch.mean(log_pi, dim=0)
-
-        advantage = reward - baseline
+        
+        loss_critic = F.mse_loss(baseline, reward)
+        
+        advantage = reward - baseline.detach()
+        
         loss_actor = torch.sum(-log_pi * advantage, dim=1)
         loss_actor = torch.mean(loss_actor)
 
-        loss_critic = F.mse_loss(baseline, reward)
         
         return loss_actor, loss_critic, reward.mean()
 
@@ -191,21 +193,21 @@ class Trainer:
         log_probs = torch.mean(log_probs, dim=0) #[time_step, batch_size, num_of_class]
         predicted = torch.max(log_probs, 2)[1]  #indices store in element[1]
         correct = (predicted[-1] == label).float().detach()
-        terminate_reward = self.terminate_reward_function(T_reward_ts, predicted.detach(), label)
+        terminate_reward = self.terminate_reward_function(T_reward_ts, predicted, label)
         loss_action = F.nll_loss(log_probs[-1], label) #classification
         prob_ts = torch.unsqueeze(prob_ts, 1)
         loss_terminate = F.binary_cross_entropy_with_logits(prob_ts, terminate_ts)
         loss_terminate = torch.mean(loss_terminate * terminate_reward)
 
 
-        return loss_action, loss_terminate, correct, predicted
+        return loss_action, loss_terminate, correct, predicted, terminate_reward
 
     def train(self):
         if self.resume:
             self.load_ckpt(is_best=False)
         for epoch in range(self.start_epoch, self.epoch_num):
             #train_loss, train_rl, train_act, train_base, train_T, train_g_num, train_acc = self.train_one_epoch(epoch)
-            train_acc, train_action_loss, train_actor_loss, train_critic_loss, avg_reward, train_g_num = self.train_one_epoch(epoch)
+            train_acc, train_action_loss, train_actor_loss, train_critic_loss, avg_reward, train_g_num, train_T_reward, train_T_loss = self.train_one_epoch(epoch)
             #val_loss, val_rl, val_act, val_base, val_T, val_g_num, val_acc = self.validate(epoch)
             val_acc, val_g_num = self.validate(epoch)
             #train_loss, train_rl, train_act, train_base, train_g_num, train_acc = self.train_one_epoch(epoch)
@@ -214,6 +216,7 @@ class Trainer:
                 is_best = True
                 self.best_val_acc = val_acc
             self.scheduler.step()
+            #train_loss = train_action_loss + train_actor_loss + train_critic_loss + train_T_loss
             train_loss = train_action_loss + train_actor_loss + train_critic_loss
             print("INFO - val_acc: {:.2f} - train_acc: {:.2f} - loss: {:.2f} - reward: {:.3f}".format(val_acc, train_acc, train_loss, avg_reward))
             writer.add_scalar('train acc', train_acc, epoch)
@@ -222,6 +225,8 @@ class Trainer:
             writer.add_scalar('train action loss', train_action_loss, epoch)
             writer.add_scalar('train actor loss', train_actor_loss, epoch)
             writer.add_scalar('train critic loss', train_critic_loss, epoch)
+            writer.add_scalar('train terminate loss', train_T_loss, epoch)
+            writer.add_scalar('train terminate reward', train_T_reward, epoch)
             writer.add_scalar('average reward', avg_reward, epoch)
             writer.add_scalar('val acc', val_acc, epoch)
             writer.add_scalar('val glimpse number', val_g_num, epoch)
@@ -253,6 +258,8 @@ class Trainer:
         avg_actor_loss = AvgMeter()
         avg_critic_loss = AvgMeter()
         avg_action_loss = AvgMeter()
+        avg_T_reward = AvgMeter()
+        avg_T_loss = AvgMeter()
         avg_g_num = AvgMeter()
         loss_rl, loss_act, loss_base, loss_T = 0, 0, 0, 0
         g_num_list = []
@@ -297,22 +304,36 @@ class Trainer:
                         log_probs = torch.stack(log_prob_list)
                         terminate_ts = torch.stack(terminate_list)
                         
-                        loss_action, loss_terminate, correct, predicted = self.MC_update(label, log_probs, prob_ts, terminate_ts, T_reward, g_num)
+                        loss_action, loss_T, correct, predicted, terminate_reward = self.MC_update(label, log_probs, prob_ts, terminate_ts, T_reward, g_num)
                         loss_action.backward()
-                        avg_action_loss.update(loss_action.item())
+                        loss_T.backward()
                         
                         loss_actor, loss_critic, average_reward = self.TD_update(alpha_list_t, b_t, log_pi_t, correct)
-                        (loss_actor + loss_critic).backward()
+                        loss_critic.backward()
+                        loss_actor.backward()
+                        
+                        torch.nn.utils.clip_grad_norm_(self.train_param, max_norm=5.0)
+                        self.optimizer.step()
+                        
+                        avg_action_loss.update(loss_action.item())
+                        avg_T_reward.update(terminate_reward.item())
+                        avg_T_loss.update(loss_T.item())
                         avg_actor_loss.update(loss_actor.item())
                         avg_critic_loss.update(loss_critic.item())
                         avg_reward.update(average_reward)
                         
-                        self.optimizer.step()
+                        
+                        break
                     
                     else:
                         loss_actor, loss_critic, average_reward = self.TD_update(alpha_list_t, b_t, log_pi_t)
-                        (loss_actor + loss_critic).backward()
+                        loss_critic.backward()
+                        loss_actor.backward()
+                        
+                        torch.nn.utils.clip_grad_norm_(self.train_param, max_norm=2.0)
+
                         self.optimizer.step()
+                        
                         avg_actor_loss.update(loss_actor.item())
                         avg_critic_loss.update(loss_critic.item())
                         avg_reward.update(average_reward)
@@ -333,7 +354,7 @@ class Trainer:
         
                 iteration = iteration + 1
         
-        return 100*avg_acc.avg, avg_action_loss.avg, avg_actor_loss.avg, avg_critic_loss.avg, avg_reward.avg, avg_g_num.avg
+        return 100*avg_acc.avg, avg_action_loss.avg, avg_actor_loss.avg, avg_critic_loss.avg, avg_reward.avg, avg_g_num.avg, avg_T_reward.avg, avg_T_loss.avg
     
     @torch.no_grad()
     def validate(self, epoch):
@@ -382,7 +403,7 @@ class Trainer:
             log_probs = torch.stack(log_prob_list)
             terminate_ts = torch.stack(terminate_list)
                 
-            loss_action, loss_terminate, correct, predicted = self.MC_update(label, log_probs, prob_ts, terminate_ts, T_reward, g_num)
+            loss_action, loss_terminate, correct, predicted, terminate_reward = self.MC_update(label, log_probs, prob_ts, terminate_ts, T_reward, g_num)
             
             
             avg_acc.update(correct.mean().item())

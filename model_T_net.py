@@ -42,8 +42,9 @@ class MultiAgentRecurrentAttention(nn.Module):
         H_t = torch.stack(h_list)
         prob = self.termination(H_t)
         stop = prob.cpu().detach().numpy() > torch.rand(1).numpy()
-        #if stop or i == self.glimpse_num - 1:
-        if i == self.glimpse_num - 1:
+        
+        #if i == self.glimpse_num - 1:
+        if stop or i == self.glimpse_num - 1:
             last = True
         
         for j in range(self.agent_num):
