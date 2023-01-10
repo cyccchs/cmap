@@ -101,7 +101,19 @@ class Trainer:
         self.optimizer = torch.optim.Adam(self.train_param, lr=0.0001)
         self.scheduler = StepLR(self.optimizer, step_size=1, gamma=0.995)
 
-    def reward_function(self, alpha_list):
+    def reward_function(self, g_list, g_prev):
+        
+        sim_list = []
+        for i in range(len(g_list)):
+            similarity = -1.0 * F.cosine_similarity(g_list[i].detach(), g_prev[i].detach())
+            similarity = similarity.view(self.batch_size, self.M)
+            similarity = torch.mean(similarity, dim=1)
+            #print(similarity.shape)
+            sim_list.append(similarity)
+
+        sim_reward = torch.stack(sim_list)
+        #print(sim_reward.shape)
+        """
         reward_batch = []
         reward_agent = []
 
@@ -117,7 +129,9 @@ class Trainer:
         reward_all = torch.stack(reward_agent) #with shape of [agent_num, batch_size]
         reward_agent = []
 
-        return(reward_all.to(self.device).permute(1,0))
+        #return(reward_all.to(self.device).permute(1,0))
+        """
+        return sim_reward.permute(1,0)
 
     def terminate_reward_function(self, T_reward, pred, label):
         correct = AvgMeter()
@@ -147,9 +161,12 @@ class Trainer:
     def reset(self):
         #init loaction of all agents
         #init hidden state & cell state of lstm cell
-        init_l_list, init_h_list, init_c_list = [], [], []
+        init_g_list, init_l_list, init_h_list, init_c_list = [], [], [], []
         
         for i in range(self.agent_num):
+            init_g = torch.zeros(self.batch_size*self.M, self.hidden_size).to(self.device)
+            init_g_list.append(init_g)
+            
             init_l = torch.FloatTensor(self.batch_size*self.M, 2).uniform_(-1.0, 1.0).to(self.device)
             init_l.requires_grad = True
             init_l_list.append(init_l)
@@ -160,10 +177,10 @@ class Trainer:
             init_c = torch.zeros(self.batch_size*self.M, self.hidden_size, dtype=torch.float32, device=self.device, requires_grad=True)
             init_c_list.append(init_c)
 
-        return init_l_list, init_h_list, init_c_list
+        return init_g_list, init_l_list, init_h_list, init_c_list
 
-    def TD_update(self, alpha_list, b, log_pi, correct=None):
-        reward = self.reward_function(alpha_list)
+    def TD_update(self, g_list, g_prev, b, log_pi, correct=None):
+        reward = self.reward_function(g_list, g_prev)
         if correct is not None:
             correct_expand = correct.expand(self.agent_num, self.batch_size)
             correct_expand = correct_expand.permute(1,0)
@@ -271,7 +288,8 @@ class Trainer:
                 label = labels.to(self.device)
                 self.optimizer.zero_grad(set_to_none=True)
                 
-                l_prev, h_prev, c_prev = self.reset()
+                g_prev, l_prev, h_prev, c_prev = self.reset()
+
                 l_list, b_list, log_pi_list, alpha_list = [], [], [], []
                 prob_list, terminate_list, log_prob_list = [], [], []
                 prob = torch.zeros(1).to(self.device)
@@ -279,8 +297,7 @@ class Trainer:
                 g_num = 0
                 
                 for i in range(self.glimpse_num):
-                    h_t, c_t, prob, l_t, b_t, log_pi_t, log_prob, alpha_list_t, last = self.model(imgs, h_prev, c_prev, l_prev, i)
-
+                    h_t, c_t, prob, l_t, b_t, log_pi_t, log_prob, alpha_list_t, last, g_list = self.model(imgs, h_prev, c_prev, l_prev, i)
 
                     if last:
                         terminate_list.append(torch.ones(1).to(self.device))
@@ -308,7 +325,7 @@ class Trainer:
                         loss_action.backward()
                         loss_T.backward()
                         
-                        loss_actor, loss_critic, average_reward = self.TD_update(alpha_list_t, b_t, log_pi_t, correct)
+                        loss_actor, loss_critic, average_reward = self.TD_update(g_list, g_prev, b_t, log_pi_t, correct)
                         loss_critic.backward()
                         loss_actor.backward()
                         
@@ -326,11 +343,11 @@ class Trainer:
                         break
                     
                     else:
-                        loss_actor, loss_critic, average_reward = self.TD_update(alpha_list_t, b_t, log_pi_t)
+                        loss_actor, loss_critic, average_reward = self.TD_update(g_list, g_prev, b_t, log_pi_t)
                         loss_critic.backward()
                         loss_actor.backward()
                         
-                        torch.nn.utils.clip_grad_norm_(self.train_param, max_norm=2.0)
+                        torch.nn.utils.clip_grad_norm_(self.train_param, max_norm=5.0)
 
                         self.optimizer.step()
                         
@@ -371,7 +388,7 @@ class Trainer:
             imgs = images.repeat(self.M, 1, 1, 1)
             label = labels.to(self.device)
                 
-            l_prev, h_prev, c_prev = self.reset()
+            g_prev, l_prev, h_prev, c_prev = self.reset()
             l_list, b_list, log_pi_list, alpha_list = [], [], [], []
             prob_list, terminate_list, log_prob_list = [], [], []
             prob = torch.zeros(1).to(self.device)
@@ -379,7 +396,7 @@ class Trainer:
             g_num = 0
             
             for i in range(self.glimpse_num):
-                h_t, c_t, prob, l_t, b_t, log_pi_t, log_prob, alpha_list_t, last = self.model(imgs, h_prev, c_prev, l_prev, i)
+                h_t, c_t, prob, l_t, b_t, log_pi_t, log_prob, alpha_list_t, last, g_list = self.model(imgs, h_prev, c_prev, l_prev, i)
 
                 if last:
                     terminate_list.append(torch.ones(1).to(self.device))

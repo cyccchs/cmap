@@ -59,7 +59,7 @@ class MultiAgentRecurrentAttention(nn.Module):
         
         log_prob = self.classifier(H_t) #[batch_size, class_num]
 
-        return h_list, c_list, prob, l_list, b_t, log_pi_t, log_prob, alpha_list, last
+        return h_list, c_list, prob, l_list, b_t, log_pi_t, log_prob, alpha_list, last, g_list
     
     def save_agent_ckpt(self, is_best=False):
         print("--------agents saving checkpoint in %s" % self.ckpt_dir)
