@@ -104,7 +104,7 @@ class Trainer:
     def reward_function(self, alpha_list):
         reward_batch = []
         reward_agent = []
-
+        
         for agent in alpha_list:
             for batch in agent:
                 reward = entropy(batch.detach().cpu(),base=self.agent_num)
