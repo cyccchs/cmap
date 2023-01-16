@@ -14,7 +14,7 @@ class MultiAgentRecurrentAttention(nn.Module):
         self.hidden_size = hidden_size
         self.device = device
         #self.softatt = networks.SoftAttention(hidden_size, device)
-        self.softatt = networks.SoftAtt(hidden_size)
+        #self.softatt = networks.SoftAtt(hidden_size)
         self.classifier = networks.ActionNetwork(hidden_size, 10)
         self.termination = networks.TerminationNetwork(hidden_size)
         for i in range(self.agent_num):
@@ -34,7 +34,8 @@ class MultiAgentRecurrentAttention(nn.Module):
         #s_t = self.selfatt(g_list)
         #s_t = torch.unbind(s_t, dim=1)  #s_t: agent_num*[batch_size, hidden_size]
         for j in range(self.agent_num):
-            alpha, z_t = self.softatt(g_list, h_prev[j])
+            #alpha, z_t = self.softatt(g_list, h_prev[j])
+            alpha, z_t = self.agents[j].att(h_prev, g_list[j])
             h_t, c_t = self.agents[j].lstm(z_t, h_prev[j], c_prev[j])
             h_list.append(h_t)
             c_list.append(c_t)
@@ -44,8 +45,8 @@ class MultiAgentRecurrentAttention(nn.Module):
         prob = self.termination(H_t)
         stop = prob.cpu().detach().numpy() > torch.rand(1).numpy()
         
-        #if i == self.glimpse_num - 1:
-        if stop or i == self.glimpse_num - 1:
+        if i == self.glimpse_num - 1:
+        #if stop or i == self.glimpse_num - 1:
             last = True
         
         for j in range(self.agent_num):

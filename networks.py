@@ -227,12 +227,16 @@ class CoreNetwork(nn.Module): #CCI(LSTM cell)
             self.load_state_dict(torch.load(self.ckpt_path))
 
 class SoftAtt(nn.Module):
-    def __init__(self, hidden_size):
+    def __init__(self, name, ckpt_dir, hidden_size, device):
         super().__init__()
+        self.ckpt_path = os.path.join(ckpt_dir, name)
+        self.best_ckpt_path = os.path.join(ckpt_dir, "best_" + name)
         self.size = hidden_size
         self.wq = nn.Linear(hidden_size, hidden_size)
         self.wk = nn.Linear(hidden_size, hidden_size)
         self.wv = nn.Linear(hidden_size, hidden_size)
+
+        self.to(device)
     
     def forward(self, g_list, h_prev):
         q = self.wq(h_prev)
@@ -261,31 +265,19 @@ class SoftAtt(nn.Module):
         h_t = h_t.sum(dim=0)
 
         return alpha.permute(1,0), h_t
-
-
-
-class SoftAttention(nn.Module):
     
-    def __init__(self, hidden_size, device):
-        super().__init__()
-        self.wk = nn.Linear(hidden_size, hidden_size)
-        self.wq = nn.Linear(hidden_size, hidden_size)
-        self.wg = nn.Linear(hidden_size, 1)
-        self.device = device
+    def save_ckpt(self, is_best):
+        if is_best:
+            torch.save(self.state_dict(), self.best_ckpt_path)
+            torch.save(self.state_dict(), self.ckpt_path)
+        else:
+            torch.save(self.state_dict(), self.ckpt_path)
     
-    def forward(self, g_list, h_prev):
-        #G = torch.stack(g_list) # to represent 4 agents' g_t
-        #y = torch.tanh(self.wk(g_t) + self.wq(h_prev))
-        y_list = [torch.tanh(self.wk(g_list[i]) + self.wq(h_prev)) for i in range(len(g_list))]
-        m_list = [self.wg(y_list[i]) for i in range(len(y_list))]
-        m_concat = torch.cat([m_list[i] for i in range(len(m_list))], dim=1)
-        alpha = F.softmax(m_concat, dim=-1)
-        #######################
-        z_list = [torch.mul(g_list[i], torch.index_select(alpha, 1, torch.tensor(i).to(self.device))) for i in range(len(g_list))]
-        z_stack = torch.stack(z_list, 2)
-        z_t = torch.sum(z_stack, 2) #similar to reduce_sum
-
-        return alpha, z_t
+    def load_ckpt(self, is_best):
+        if is_best:
+            self.load_state_dict(torch.load(self.best_ckpt_path))
+        else:
+            self.load_state_dict(torch.load(self.ckpt_path))
 
 class ActionNetwork(nn.Module):
     """The action network.

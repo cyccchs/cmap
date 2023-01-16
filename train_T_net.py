@@ -45,9 +45,9 @@ class Trainer:
         self.save_ckpt_per_n_epoch = 50
         self.resume = False
         self.pbar_detail = False
-        self.M = 10 #monte carlo sample = 10
+        self.M = 2 #monte carlo sample = 10
         self.duration = 99999
-        self.save_gap = 300
+        self.save_gap = 100
         self.epoch_time = 0.0
         self.best_val_acc = 0.0
         self.start_epoch = 0
@@ -55,7 +55,7 @@ class Trainer:
         self.glimpse_size = 8
         self.scale = 1.0
         self.patch_num = 1
-        self.glimpse_num = 4
+        self.glimpse_num = 6
         self.agent_num = 4
         self.epoch_num = 400
         self.ckpt_dir = "./ckpt"
@@ -167,7 +167,7 @@ class Trainer:
         if correct is not None:
             correct_expand = correct.expand(self.agent_num, self.batch_size)
             correct_expand = correct_expand.permute(1,0)
-            reward = reward + correct_expand
+            reward = reward + 10*correct_expand
         
         baseline = b.view(self.M, self.batch_size, -1)
         baseline = torch.mean(baseline, dim=0)
@@ -193,11 +193,16 @@ class Trainer:
         log_probs = torch.mean(log_probs, dim=0) #[time_step, batch_size, num_of_class]
         predicted = torch.max(log_probs, 2)[1]  #indices store in element[1]
         correct = (predicted[-1] == label).float().detach()
-        terminate_reward = self.terminate_reward_function(T_reward_ts, predicted, label)
         loss_action = F.nll_loss(log_probs[-1], label) #classification
+        
+        """
+        terminate_reward = self.terminate_reward_function(T_reward_ts, predicted, label)
         prob_ts = torch.unsqueeze(prob_ts, 1)
         loss_terminate = F.binary_cross_entropy_with_logits(prob_ts, terminate_ts)
         loss_terminate = torch.mean(loss_terminate * terminate_reward)
+        """
+        loss_terminate = 0.0
+        terminate_reward = 0.0
 
 
         return loss_action, loss_terminate, correct, predicted, terminate_reward
@@ -306,11 +311,12 @@ class Trainer:
                         
                         loss_action, loss_T, correct, predicted, terminate_reward = self.MC_update(label, log_probs, prob_ts, terminate_ts, T_reward, g_num)
                         loss_action.backward()
-                        loss_T.backward()
+                        #loss_T.backward()
                         
                         loss_actor, loss_critic, average_reward = self.TD_update(alpha_list_t, b_t, log_pi_t, correct)
-                        loss_critic.backward()
-                        loss_actor.backward()
+                        #loss_critic.backward()
+                        #loss_actor.backward()
+                        (loss_actor + loss_critic).backward()
                         
                         torch.nn.utils.clip_grad_norm_(self.train_param, max_norm=5.0)
                         self.optimizer.step()
@@ -327,10 +333,11 @@ class Trainer:
                     
                     else:
                         loss_actor, loss_critic, average_reward = self.TD_update(alpha_list_t, b_t, log_pi_t)
-                        loss_critic.backward()
-                        loss_actor.backward()
+                        #loss_critic.backward()
+                        #loss_actor.backward()
+                        (loss_actor + loss_critic).backward()
                         
-                        torch.nn.utils.clip_grad_norm_(self.train_param, max_norm=2.0)
+                        torch.nn.utils.clip_grad_norm_(self.train_param, max_norm=5.0)
 
                         self.optimizer.step()
                         
