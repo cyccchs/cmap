@@ -167,7 +167,7 @@ class Trainer:
         if correct is not None:
             correct_expand = correct.expand(self.agent_num, self.batch_size)
             correct_expand = correct_expand.permute(1,0)
-            reward = reward + 10*correct_expand
+            reward = reward + correct_expand
         
         baseline = b.view(self.M, self.batch_size, -1)
         baseline = torch.mean(baseline, dim=0)
@@ -195,14 +195,10 @@ class Trainer:
         correct = (predicted[-1] == label).float().detach()
         loss_action = F.nll_loss(log_probs[-1], label) #classification
         
-        """
         terminate_reward = self.terminate_reward_function(T_reward_ts, predicted, label)
         prob_ts = torch.unsqueeze(prob_ts, 1)
         loss_terminate = F.binary_cross_entropy_with_logits(prob_ts, terminate_ts)
         loss_terminate = torch.mean(loss_terminate * terminate_reward)
-        """
-        loss_terminate = 0.0
-        terminate_reward = 0.0
 
 
         return loss_action, loss_terminate, correct, predicted, terminate_reward
@@ -212,9 +208,9 @@ class Trainer:
             self.load_ckpt(is_best=False)
         for epoch in range(self.start_epoch, self.epoch_num):
             #train_loss, train_rl, train_act, train_base, train_T, train_g_num, train_acc = self.train_one_epoch(epoch)
-            train_acc, train_action_loss, train_actor_loss, train_critic_loss, avg_reward, train_g_num, train_T_reward, train_T_loss = self.train_one_epoch(epoch)
+            train_acc, train_action_loss, train_actor_loss, train_critic_loss, train_avg_reward, train_g_num, train_T_reward, train_T_loss = self.train_one_epoch(epoch)
             #val_loss, val_rl, val_act, val_base, val_T, val_g_num, val_acc = self.validate(epoch)
-            val_acc, val_g_num = self.validate(epoch)
+            val_acc, val_g_num, val_avg_reward = self.validate(epoch)
             #train_loss, train_rl, train_act, train_base, train_g_num, train_acc = self.train_one_epoch(epoch)
             #val_loss, val_rl, val_act, val_base, val_g_num, val_acc = self.validate(epoch)
             if val_acc > self.best_val_acc:
@@ -223,7 +219,7 @@ class Trainer:
             self.scheduler.step()
             #train_loss = train_action_loss + train_actor_loss + train_critic_loss + train_T_loss
             train_loss = train_action_loss + train_actor_loss + train_critic_loss
-            print("INFO - val_acc: {:.2f} - train_acc: {:.2f} - loss: {:.2f} - reward: {:.3f}".format(val_acc, train_acc, train_loss, avg_reward))
+            print("INFO - val_acc: {:.2f} - train_acc: {:.2f} - loss: {:.2f} - reward: {:.3f}".format(val_acc, train_acc, train_loss, train_avg_reward))
             writer.add_scalar('train acc', train_acc, epoch)
             writer.add_scalar('train glimpse number', train_g_num, epoch)
             writer.add_scalar('train loss', train_loss, epoch)
@@ -232,9 +228,10 @@ class Trainer:
             writer.add_scalar('train critic loss', train_critic_loss, epoch)
             writer.add_scalar('train terminate loss', train_T_loss, epoch)
             writer.add_scalar('train terminate reward', train_T_reward, epoch)
-            writer.add_scalar('average reward', avg_reward, epoch)
+            writer.add_scalar('train_average reward', train_avg_reward, epoch)
             writer.add_scalar('val acc', val_acc, epoch)
             writer.add_scalar('val glimpse number', val_g_num, epoch)
+            writer.add_scalar('val average reward', val_avg_reward, epoch)
             #writer.add_scalar('val loss', val_loss, epoch)
             writer.add_scalar('best val acc', self.best_val_acc, epoch)
             writer.flush()
@@ -314,9 +311,8 @@ class Trainer:
                         #loss_T.backward()
                         
                         loss_actor, loss_critic, average_reward = self.TD_update(alpha_list_t, b_t, log_pi_t, correct)
-                        #loss_critic.backward()
-                        #loss_actor.backward()
-                        (loss_actor + loss_critic).backward()
+                        loss_critic.backward()
+                        loss_actor.backward()
                         
                         torch.nn.utils.clip_grad_norm_(self.train_param, max_norm=5.0)
                         self.optimizer.step()
@@ -333,9 +329,8 @@ class Trainer:
                     
                     else:
                         loss_actor, loss_critic, average_reward = self.TD_update(alpha_list_t, b_t, log_pi_t)
-                        #loss_critic.backward()
-                        #loss_actor.backward()
-                        (loss_actor + loss_critic).backward()
+                        loss_critic.backward()
+                        loss_actor.backward()
                         
                         torch.nn.utils.clip_grad_norm_(self.train_param, max_norm=5.0)
 
@@ -368,7 +363,7 @@ class Trainer:
         iteration = 0
         acc_list, loss_list, reward_list = [], [], []
         avg_acc = AvgMeter()
-        avg_loss = AvgMeter()
+        avg_reward = AvgMeter()
         avg_g_num = AvgMeter()
         loss_rl, loss_act, loss_base, loss_T = [], [], [], []
         g_num_list = []
@@ -405,16 +400,18 @@ class Trainer:
                 l_prev = l_t
                 g_num = g_num + 1
                 if last:
+                    prob_ts = torch.stack(prob_list)
+                    log_probs = torch.stack(log_prob_list)
+                    terminate_ts = torch.stack(terminate_list)
+                        
+                    loss_action, loss_terminate, correct, predicted, terminate_reward = self.MC_update(label, log_probs, prob_ts, terminate_ts, T_reward, g_num)
                     break
-            prob_ts = torch.stack(prob_list)
-            log_probs = torch.stack(log_prob_list)
-            terminate_ts = torch.stack(terminate_list)
-                
-            loss_action, loss_terminate, correct, predicted, terminate_reward = self.MC_update(label, log_probs, prob_ts, terminate_ts, T_reward, g_num)
+                else:
+                    loss_actor, loss_critic, average_reward = self.TD_update(alpha_list_t, b_t, log_pi_t)
+                    avg_reward.update(average_reward)
             
             
             avg_acc.update(correct.mean().item())
-            #avg_loss.update(loss.item())
             avg_g_num.update(g_num)
             
             if self.duration > self.save_gap and iteration == 0:
@@ -422,7 +419,7 @@ class Trainer:
             
             iteration = iteration + 1
    
-        return 100*avg_acc.avg, avg_g_num.avg
+        return 100*avg_acc.avg, avg_g_num.avg, avg_reward.avg
     
     def save_ckpt(self, state, is_best=False):
         print("----Saving model in {}".format(self.ckpt_dir))

@@ -239,30 +239,14 @@ class SoftAtt(nn.Module):
         self.to(device)
     
     def forward(self, g_list, h_prev):
+        G = torch.stack(g_list)
         q = self.wq(h_prev)
-        k_list = [self.wk(g) for g in g_list]
-        v_list = [self.wv(g) for g in g_list]
-        v = torch.stack(v_list)
+        k = self.wk(G)
+        v = self.wv(G)
 
-        att_score_list = []
-        for k in k_list:
-            dot_list = []
-            for i in range(q.size(0)):
-                dot_list.append(torch.dot(q[i,:], k[i,:]))
-            dot_tensor = torch.stack(dot_list)
-            att_score_list.append(dot_tensor)
-        att_score = torch.stack(att_score_list)
-        
+        att_score = torch.einsum('ijk,jk->ij', k, q)
         alpha = F.softmax(att_score, dim=0)
-        
-        h_list = []
-        for i in range(alpha.size(0)):
-            for j in range(alpha.size(1)):
-                h = torch.mul(alpha[i,j], v[i,j])
-                h_list.append(h)
-
-        h_t = torch.stack(h_list).view(alpha.size(0), alpha.size(1), -1)
-        h_t = h_t.sum(dim=0)
+        h_t = torch.einsum('ij,ijk->jk', alpha, v)
 
         return alpha.permute(1,0), h_t
     
