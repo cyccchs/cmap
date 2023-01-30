@@ -311,9 +311,8 @@ class Trainer:
                         #loss_T.backward()
                         
                         loss_actor, loss_critic, average_reward = self.TD_update(alpha_list_t, b_t, log_pi_t, correct)
-                        if epoch > 30:
-                            loss_critic.backward()
-                            loss_actor.backward()
+                        loss_critic.backward()
+                        loss_actor.backward()
                         
                         torch.nn.utils.clip_grad_norm_(self.train_param, max_norm=5.0)
                         self.optimizer.step()
@@ -330,9 +329,8 @@ class Trainer:
                     
                     else:
                         loss_actor, loss_critic, average_reward = self.TD_update(alpha_list_t, b_t, log_pi_t)
-                        if epoch > 30:
-                            loss_critic.backward()
-                            loss_actor.backward()
+                        loss_critic.backward()
+                        loss_actor.backward()
                         
                         torch.nn.utils.clip_grad_norm_(self.train_param, max_norm=5.0)
 
