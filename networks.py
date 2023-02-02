@@ -238,7 +238,7 @@ class SoftAtt(nn.Module):
 
         self.to(device)
     
-    def forward(self, g_list, h_prev):
+    def forward(self, g_list, h_prev, agent_index):
         G = torch.stack(g_list)
         q = self.wq(h_prev)
         k = self.wk(G)
@@ -248,7 +248,7 @@ class SoftAtt(nn.Module):
         alpha = F.softmax(att_score, dim=0)
         h_t = torch.einsum('ij,ijk->jk', alpha, v)
 
-        return alpha.permute(1,0), h_t
+        return alpha, h_t
     
     def save_ckpt(self, is_best):
         if is_best:

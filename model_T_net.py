@@ -1,6 +1,7 @@
 import torch.nn as nn
 import torch
 import networks
+import torch.nn.functional as F
 from agent import Agent
 
 class MultiAgentRecurrentAttention(nn.Module):
@@ -22,7 +23,7 @@ class MultiAgentRecurrentAttention(nn.Module):
     
 
     def forward(self, img, h_prev, c_prev, l_prev, i):
-        g_list, b_list, l_list, alpha_list, h_list, c_list, log_pi_list = [], [], [], [], [], [], []
+        g_list, b_list, l_list, alpha_list, mix_alpha_list, v_list, h_list, c_list, log_pi_list = [], [], [], [], [], [], [], [], []
         log_prob = -1
         last = False
         stop = False
@@ -35,13 +36,21 @@ class MultiAgentRecurrentAttention(nn.Module):
         #s_t = torch.unbind(s_t, dim=1)  #s_t: agent_num*[batch_size, hidden_size]
         for j in range(self.agent_num):
             #alpha, z_t = self.agents[j].att(g_list, h_prev[j])
-            alpha, z_t = self.agents[j].att(h_prev, g_list[j])
+            alpha, z_t = self.agents[j].att(h_prev, g_list[j], j)
             h_t, c_t = self.agents[j].lstm(z_t, h_prev[j], c_prev[j])
+
             h_list.append(h_t)
             c_list.append(c_t)
-            alpha_list.append(alpha)
+            
+            mix_alpha_list.append(alpha[j])
+            alpha_list.append(alpha.detach().permute(1,0))
         
-        H_t = torch.stack(h_list)
+        mix_alpha = torch.stack(mix_alpha_list)
+        normalized_mix_alpha = F.softmax(mix_alpha, dim=0) #[4, 32]
+        h_mix = torch.stack(h_list) #[4 32 256]
+        
+        H_t = torch.einsum('ij,ijk->jk', normalized_mix_alpha, h_mix) #[32 256]
+       
         prob = self.termination(H_t)
         #stop = prob.cpu().detach().numpy() > torch.rand(1).numpy()
         
