@@ -32,8 +32,6 @@ class MultiAgentRecurrentAttention(nn.Module):
             g_list.append(self.agents[j].glimpse_feature(img, l_prev[j]))
             #g_list: agent_num*[b, hidden_size]
         
-        #s_t = self.selfatt(g_list)
-        #s_t = torch.unbind(s_t, dim=1)  #s_t: agent_num*[batch_size, hidden_size]
         for j in range(self.agent_num):
             #alpha, z_t = self.agents[j].att(g_list, h_prev[j])
             alpha, z_t = self.agents[j].att(h_prev, g_list[j], j)
@@ -51,11 +49,7 @@ class MultiAgentRecurrentAttention(nn.Module):
         
         H_t = torch.einsum('ij,ijk->jk', normalized_mix_alpha, h_mix) #[32 256]
        
-        prob = self.termination(H_t)
-        #stop = prob.cpu().detach().numpy() > torch.rand(1).numpy()
-        
         if i == self.glimpse_num - 1:
-        #if stop or i == self.glimpse_num - 1:
             last = True
         
         for j in range(self.agent_num):
@@ -70,7 +64,7 @@ class MultiAgentRecurrentAttention(nn.Module):
         
         log_prob = self.classifier(H_t) #[batch_size, class_num]
 
-        return h_list, c_list, prob, l_list, b_t, log_pi_t, log_prob, alpha_list, last
+        return h_list, c_list, l_list, b_t, log_pi_t, log_prob, alpha_list, last
     
     def save_agent_ckpt(self, is_best=False):
         print("--------agents saving checkpoint in %s" % self.ckpt_dir)
