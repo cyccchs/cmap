@@ -14,8 +14,6 @@ class MultiAgentRecurrentAttention(nn.Module):
         self.glimpse_num = glimpse_num
         self.hidden_size = hidden_size
         self.device = device
-        #self.softatt = networks.SoftAttention(hidden_size, device)
-        #self.softatt = networks.SoftAtt(hidden_size)
         self.classifier = networks.ActionNetwork(hidden_size, 10)
         self.termination = networks.TerminationNetwork(hidden_size)
         for i in range(self.agent_num):

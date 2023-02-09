@@ -243,6 +243,7 @@ class Trainer:
                 l_prev, h_prev, c_prev = self.reset()
                 l_list, b_list, log_pi_list, alpha_list = [], [], [], []
                 prob_list, terminate_list, log_prob_list = [], [], []
+                loss_actor_list, loss_critic_list = [], []
                 g_num = 0
                 
                 for i in range(self.glimpse_num):
@@ -265,8 +266,15 @@ class Trainer:
                         loss_action.backward()
                         
                         loss_actor, loss_critic, average_reward = self.TD_update(alpha_list_t, b_t, log_pi_t, correct)
-                        loss_critic.backward()
-                        loss_actor.backward()
+                        
+                        loss_actor_list.append(loss_actor)
+                        loss_critic_list.append(loss_critic)
+
+                        loss_act = torch.stack(loss_actor_list).mean()
+                        loss_cri = torch.stack(loss_critic_list).mean()
+
+                        loss_act.backward()
+                        loss_cri.backward()
                         
                         torch.nn.utils.clip_grad_norm_(self.train_param, max_norm=5.0)
                         self.optimizer.step()
@@ -280,26 +288,18 @@ class Trainer:
                     
                     else:
                         loss_actor, loss_critic, average_reward = self.TD_update(alpha_list_t, b_t, log_pi_t)
-                        loss_critic.backward()
-                        loss_actor.backward()
                         
-                        torch.nn.utils.clip_grad_norm_(self.train_param, max_norm=5.0)
-
-                        self.optimizer.step()
+                        loss_actor_list.append(loss_actor)
+                        loss_critic_list.append(loss_critic)
                         
                         avg_actor_loss.update(loss_actor.item())
                         avg_critic_loss.update(loss_critic.item())
                         avg_reward.update(average_reward)
                 
-                #loss = loss_action + loss_reinforce + loss_baseline + loss_terminate
                 
                 avg_acc.update(correct.mean().item())
-                #avg_loss.update(loss.item())
                 avg_g_num.update(g_num)
 
-                #loss.backward(retain_graph=False)
-                #torch.nn.utils.clip_grad_norm_(self.train_param, max_norm=5.0)
-                #self.optimizer.step()
                 if self.duration > self.save_gap and iteration == 0:
                 	draw(images, l_list, label, predicted[-1], self.batch_size, self.agent_num, self.glimpse_size, g_num, self.patch_num, self.scale, self.M, epoch, 'train')
                 end_t = time.time()
