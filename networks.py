@@ -131,8 +131,8 @@ class LocationNetwork(nn.Module):
         self.fc_mu = nn.Linear(hidden_size, output_size)
         self.to(device)
 
-    def forward(self, g_t):
-        feat = F.relu(self.fc_feat(g_t.detach()))
+    def forward(self, alpha_v):
+        feat = F.relu(self.fc_feat(alpha_v))
         mu = torch.tanh(self.fc_mu(feat))
         l_t = Normal(mu, self.std).rsample()
         l_t = l_t.detach()
@@ -171,8 +171,8 @@ class BaselineNetwork(nn.Module):
         self.fc = nn.Linear(input_size, output_size)
         self.to(device)
 
-    def forward(self, alpha):
-        b = self.fc(alpha.detach())
+    def forward(self, alpha_v):
+        b = self.fc(alpha_v)
         b = torch.squeeze(b, 1)
         
         return b
@@ -238,17 +238,17 @@ class SoftAtt(nn.Module):
 
         self.to(device)
     
-    def forward(self, g_list, h_prev, agent_index):
-        G = torch.stack(g_list)
-        q = self.wq(h_prev)
-        k = self.wk(G)
-        v = self.wv(G)
+    def forward(self, h_list, g_t, agent_index):
+        H = torch.stack(h_list)
+        q = self.wq(H)
+        k = self.wk(g_t)
+        v = self.wv(g_t)
 
-        att_score = torch.einsum('ijk,jk->ij', k, q)
+        att_score = torch.einsum('ijk,jk->ij', q, k)
         alpha = F.softmax(att_score, dim=0)
-        h_t = torch.einsum('ij,ijk->jk', alpha, v)
+        alpha_v = torch.einsum('i,ij->ij', alpha[agent_index], v)
 
-        return alpha, h_t
+        return alpha, alpha_v
     
     def save_ckpt(self, is_best):
         if is_best:
@@ -289,7 +289,7 @@ class ActionNetwork(nn.Module):
         self.fc = nn.Linear(input_size, output_size)
 
     def forward(self, h_t):
-        action = F.log_softmax(self.fc(h_t), dim=1)
+        action = F.log_softmax(self.fc(h_t.detach()), dim=1)
         
         return action
 

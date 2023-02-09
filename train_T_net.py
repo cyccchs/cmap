@@ -273,8 +273,8 @@ class Trainer:
                         loss_act = torch.stack(loss_actor_list).mean()
                         loss_cri = torch.stack(loss_critic_list).mean()
 
-                        loss_act.backward()
-                        loss_cri.backward()
+                        (loss_act + loss_cri).backward()
+                        #loss_cri.backward()
                         
                         torch.nn.utils.clip_grad_norm_(self.train_param, max_norm=5.0)
                         self.optimizer.step()
