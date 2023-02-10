@@ -14,8 +14,6 @@ class MultiAgentRecurrentAttention(nn.Module):
         self.glimpse_num = glimpse_num
         self.hidden_size = hidden_size
         self.device = device
-        #self.softatt = networks.SoftAttention(hidden_size, device)
-        #self.softatt = networks.SoftAtt(hidden_size)
         self.classifier = networks.ActionNetwork(hidden_size, 10)
         self.termination = networks.TerminationNetwork(hidden_size)
         for i in range(self.agent_num):
@@ -33,9 +31,14 @@ class MultiAgentRecurrentAttention(nn.Module):
             #g_list: agent_num*[b, hidden_size]
         
         for j in range(self.agent_num):
-            #alpha, z_t = self.agents[j].att(g_list, h_prev[j])
-            alpha, z_t = self.agents[j].att(h_prev, g_list[j], j)
-            h_t, c_t = self.agents[j].lstm(z_t, h_prev[j], c_prev[j])
+            alpha, alpha_v = self.agents[j].att(h_prev, g_list[j], j)
+            h_t, c_t = self.agents[j].lstm(alpha_v, h_prev[j], c_prev[j])
+            
+            log_pi, l_t = self.agents[j].location(alpha_v)
+            b = self.agents[j].baseline(alpha_v)
+            b_list.append(b)
+            l_list.append(l_t)
+            log_pi_list.append(log_pi)
 
             h_list.append(h_t)
             c_list.append(c_t)
@@ -43,27 +46,20 @@ class MultiAgentRecurrentAttention(nn.Module):
             mix_alpha_list.append(alpha[j])
             alpha_list.append(alpha.detach().permute(1,0))
         
+        b_t = torch.stack(b_list, dim=1) #[agent_num, batch_size]
+        log_pi_t = torch.stack(log_pi_list, dim=1)
+        
         mix_alpha = torch.stack(mix_alpha_list)
         normalized_mix_alpha = F.softmax(mix_alpha, dim=0) #[4, 32]
         h_mix = torch.stack(h_list) #[4 32 256]
         
         H_t = torch.einsum('ij,ijk->jk', normalized_mix_alpha, h_mix) #[32 256]
        
+        log_prob = self.classifier(H_t) #[batch_size, class_num]
+        
         if i == self.glimpse_num - 1:
             last = True
         
-        for j in range(self.agent_num):
-            log_pi, l_t = self.agents[j].location(g_list[j])
-            b = self.agents[j].baseline(g_list[j])
-            b_list.append(b)
-            l_list.append(l_t)
-            log_pi_list.append(log_pi)
-        
-        b_t = torch.stack(b_list, dim=1) #[agent_num, batch_size]
-        log_pi_t = torch.stack(log_pi_list, dim=1)
-        
-        log_prob = self.classifier(H_t) #[batch_size, class_num]
-
         return h_list, c_list, l_list, b_t, log_pi_t, log_prob, alpha_list, last
     
     def save_agent_ckpt(self, is_best=False):

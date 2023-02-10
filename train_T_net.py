@@ -179,17 +179,12 @@ class Trainer:
         if self.resume:
             self.load_ckpt(is_best=False)
         for epoch in range(self.start_epoch, self.epoch_num):
-            #train_loss, train_rl, train_act, train_base, train_T, train_g_num, train_acc = self.train_one_epoch(epoch)
             train_acc, train_action_loss, train_actor_loss, train_critic_loss, train_avg_reward, train_g_num = self.train_one_epoch(epoch)
-            #val_loss, val_rl, val_act, val_base, val_T, val_g_num, val_acc = self.validate(epoch)
             val_acc, val_g_num, val_avg_reward = self.validate(epoch)
-            #train_loss, train_rl, train_act, train_base, train_g_num, train_acc = self.train_one_epoch(epoch)
-            #val_loss, val_rl, val_act, val_base, val_g_num, val_acc = self.validate(epoch)
             if val_acc > self.best_val_acc:
                 is_best = True
                 self.best_val_acc = val_acc
             self.scheduler.step()
-            #train_loss = train_action_loss + train_actor_loss + train_critic_loss + train_T_loss
             train_loss = train_action_loss + train_actor_loss + train_critic_loss
             print("INFO - val_acc: {:.2f} - train_acc: {:.2f} - loss: {:.2f} - reward: {:.3f}".format(val_acc, train_acc, train_loss, train_avg_reward))
             writer.add_scalar('train acc', train_acc, epoch)
@@ -265,6 +260,7 @@ class Trainer:
                         loss_action.backward()
                         
                         loss_actor, loss_critic, average_reward = self.TD_update(alpha_list_t, b_t, log_pi_t, correct)
+                        
                         loss_critic.backward()
                         loss_actor.backward()
                         
@@ -280,6 +276,7 @@ class Trainer:
                     
                     else:
                         loss_actor, loss_critic, average_reward = self.TD_update(alpha_list_t, b_t, log_pi_t)
+                        
                         loss_critic.backward()
                         loss_actor.backward()
                         
@@ -291,15 +288,10 @@ class Trainer:
                         avg_critic_loss.update(loss_critic.item())
                         avg_reward.update(average_reward)
                 
-                #loss = loss_action + loss_reinforce + loss_baseline + loss_terminate
                 
                 avg_acc.update(correct.mean().item())
-                #avg_loss.update(loss.item())
                 avg_g_num.update(g_num)
 
-                #loss.backward(retain_graph=False)
-                #torch.nn.utils.clip_grad_norm_(self.train_param, max_norm=5.0)
-                #self.optimizer.step()
                 if self.duration > self.save_gap and iteration == 0:
                 	draw(images, l_list, label, predicted[-1], self.batch_size, self.agent_num, self.glimpse_size, g_num, self.patch_num, self.scale, self.M, epoch, 'train')
                 end_t = time.time()
